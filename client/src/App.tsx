@@ -17,15 +17,22 @@ export function App() {
     const [loading, setLoading] = useState(!!token);
 
     function clearForm() {
-        setUsername(""); setPassword(""); setRole("User"); setEditId(null);
+        setUsername("");
+        setPassword("");
+        setRole("User");
+        setEditId(null);
     }
 
     function logout() {
-        sessionStorage.removeItem("token"); setToken(null); setUser(null);
-        setUsers([]); setMessage(""); clearForm();
+        sessionStorage.removeItem("token");
+        setToken(null);
+        setUser(null);
+        setUsers([]);
+        setMessage("");
+        clearForm();
     }
 
-    async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+    async function sendRequest(path: string, method = "GET", body?: object) {
         const response = await fetch(path, {
             method,
             headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -35,65 +42,105 @@ export function App() {
             logout();
             throw new Error(path === "/login" ? "Forkert brugernavn eller adgangskode." : "Log ind igen.");
         }
-        if (response.status === 403) throw new Error("Du har ikke adgang til denne handling.");
-        if (!response.ok) {
-            const text = await response.text();
-            let message = text;
-            try {
-                const data = JSON.parse(text);
-                message = data.errors ? Object.values(data.errors).flat().join(" ") : data.title || text;
-            } catch { /* API'et kan også returnere en almindelig tekstbesked. */ }
-            throw new Error(message || "Handlingen mislykkedes.");
+        if (response.status === 403) {
+            throw new Error("Du har ikke adgang til denne handling.");
         }
-        return response.status === 204 ? undefined as T : response.json();
+        if (response.status === 409) {
+            throw new Error("Brugernavnet er allerede i brug.");
+        }
+        if (!response.ok) {
+            throw new Error("Handlingen mislykkedes. Kontrollér oplysningerne.");
+        }
+        return response;
     }
 
-    function showError(e: unknown) {
-        setError(e instanceof Error ? e.message : "Serveren kan ikke kontaktes.");
+    async function getUsers() {
+        const response = await sendRequest("/api/users");
+        setUsers(await response.json());
     }
 
-    async function getUsers() { setUsers(await request<User[]>("/api/users")); }
+    async function loadUser() {
+        try {
+            const response = await sendRequest("/api/auth/me");
+            setUser(await response.json());
+            await getUsers();
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+        } finally {
+            setLoading(false);
+        }
+    }
 
     useEffect(() => {
-        if (!token) return;
-        setLoading(true);
-        Promise.all([request<User>("/api/auth/me"), request<User[]>("/api/users")])
-            .then(([me, list]) => { setUser(me); setUsers(list); })
-            .catch(showError).finally(() => setLoading(false));
+        if (token) {
+            setLoading(true);
+            loadUser();
+        }
     }, [token]);
 
-    async function login(e: FormEvent) {
-        e.preventDefault(); setBusy(true); setError("");
+    async function login(event: FormEvent) {
+        event.preventDefault();
+        setBusy(true);
+        setError("");
         try {
-            const data = await request<{ token: string; user: User }>("/login", "POST", { username, password });
-            sessionStorage.setItem("token", data.token); setToken(data.token); setUser(data.user); clearForm();
-        } catch (e) { showError(e); }
-        finally { setBusy(false); }
+            const response = await sendRequest("/login", "POST", { username, password });
+            const data = await response.json();
+            sessionStorage.setItem("token", data.token);
+            setToken(data.token);
+            setUser(data.user);
+            clearForm();
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+        } finally {
+            setBusy(false);
+        }
     }
 
-    async function saveUser(e: FormEvent) {
-        e.preventDefault(); setBusy(true); setError(""); setMessage("");
+    async function saveUser(event: FormEvent) {
+        event.preventDefault();
+        setBusy(true);
+        setError("");
+        setMessage("");
         try {
-            await request(editId === null ? "/api/users" : `/api/users/${editId}`,
-                editId === null ? "POST" : "PUT", { username, password: password || null, role });
-            clearForm(); await getUsers(); setMessage("Brugeren er gemt.");
-        } catch (e) { showError(e); }
-        finally { setBusy(false); }
+            const data = { username, password: password || null, role };
+            if (editId === null) {
+                await sendRequest("/api/users", "POST", data);
+            } else {
+                await sendRequest(`/api/users/${editId}`, "PUT", data);
+            }
+            clearForm();
+            await getUsers();
+            setMessage("Brugeren er gemt.");
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+        } finally {
+            setBusy(false);
+        }
     }
 
-    function editUser(target: User) {
-        setUsername(target.username); setRole(target.role); setPassword(""); setEditId(target.id); setMessage("");
+    function editUser(user: User) {
+        setUsername(user.username);
+        setRole(user.role);
+        setPassword("");
+        setEditId(user.id);
+        setMessage("");
     }
 
-    async function deleteUser(target: User) {
-        if (!confirm(`Vil du slette ${target.username}?`)) return;
-        setBusy(true); setError(""); setMessage("");
+    async function deleteUser(user: User) {
+        if (!confirm(`Vil du slette ${user.username}?`)) return;
+        setBusy(true);
+        setError("");
+        setMessage("");
         try {
-            await request(`/api/users/${target.id}`, "DELETE");
-            if (editId === target.id) clearForm();
-            await getUsers(); setMessage("Brugeren er slettet.");
-        } catch (e) { showError(e); }
-        finally { setBusy(false); }
+            await sendRequest(`/api/users/${user.id}`, "DELETE");
+            if (editId === user.id) clearForm();
+            await getUsers();
+            setMessage("Brugeren er slettet.");
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+        } finally {
+            setBusy(false);
+        }
     }
 
     if (loading) return <p>Henter brugere…</p>;

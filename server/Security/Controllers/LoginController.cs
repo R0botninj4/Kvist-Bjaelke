@@ -22,6 +22,10 @@ public class LoginController(AppDbContext db, Argon2PasswordHasher hasher, Token
     }
 
     [Authorize, HttpGet("/api/auth/me")]
-    public async Task<IActionResult> Me() => Ok(await db.Users.FindAsync(
-        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!)));
+    public async Task<IActionResult> Me()
+    {
+        var id = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await db.Users.FindAsync(id);
+        return Ok(user);
+    }
 }

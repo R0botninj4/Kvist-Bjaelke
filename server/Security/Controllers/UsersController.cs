@@ -13,12 +13,23 @@ namespace Security.Controllers;
 [ApiController, Authorize, Route("api/[controller]")]
 public class UsersController(AppDbContext db) : ControllerBase
 {
-    private bool CanManage(string role) => User.IsInRole("Admin") || (User.IsInRole("SuperUser") && role == "User");
+    private bool CanManage(string role)
+    {
+        if (User.IsInRole("Admin")) return true;
+        return User.IsInRole("SuperUser") && role == "User";
+    }
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpGet]
-    public async Task<List<User>> GetAll() => await db.Users.AsNoTracking()
-        .Where(u => User.IsInRole("Admin") || u.Role == "User").OrderBy(u => u.Username).ToListAsync();
+    public async Task<List<User>> GetAll()
+    {
+        var users = db.Users.AsNoTracking();
+        if (!User.IsInRole("Admin"))
+        {
+            users = users.Where(user => user.Role == "User");
+        }
+        return await users.OrderBy(user => user.Username).ToListAsync();
+    }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
@@ -40,7 +51,7 @@ public class UsersController(AppDbContext db) : ControllerBase
             Role = request.Role, PasswordHash = Argon2PasswordHasher.Hash(request.Password)
         };
         db.Users.Add(user);
-        if (!await Save()) return Conflict("Brugernavnet er allerede i brug.");
+        if (!await SaveChanges()) return Conflict("Brugernavnet er allerede i brug.");
         return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
     }
 
@@ -56,7 +67,7 @@ public class UsersController(AppDbContext db) : ControllerBase
         user.Role = request.Role;
         if (request.Password != null) user.PasswordHash = Argon2PasswordHasher.Hash(request.Password);
         user.SecurityVersion++;
-        if (!await Save()) return Conflict("Brugernavnet er allerede i brug.");
+        if (!await SaveChanges()) return Conflict("Brugernavnet er allerede i brug.");
         return Ok(user);
     }
 
@@ -72,9 +83,16 @@ public class UsersController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
-    private async Task<bool> Save()
+    private async Task<bool> SaveChanges()
     {
-        try { await db.SaveChangesAsync(); return true; }
-        catch (DbUpdateException e) when (e.InnerException is SqliteException { SqliteErrorCode: 19 }) { return false; }
+        try
+        {
+            await db.SaveChangesAsync();
+            return true;
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqliteException { SqliteErrorCode: 19 })
+        {
+            return false;
+        }
     }
 }

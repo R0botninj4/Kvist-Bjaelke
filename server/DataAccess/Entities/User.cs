@@ -13,4 +13,3 @@ public class User
     public int SecurityVersion { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
-

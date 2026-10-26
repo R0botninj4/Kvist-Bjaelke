@@ -1,5 +1,7 @@
 **/bin/
 **/obj/
+**/node_modules/
+server/Security/wwwroot/
 .env
 .env.*
 !.env.example

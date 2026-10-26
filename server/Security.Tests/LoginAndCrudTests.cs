@@ -1,102 +1,105 @@
 using System.Net;
-using System.Text.RegularExpressions;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using DataAccess;
+using DataAccess.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
-using Security.Services;
 using Xunit;
 
 namespace Security.Tests;
 
-// Tester de rigtige C#-sider med en separat, midlertidig database.
+// HTTP-tests med en midlertidig database. Din lokale app.db ændres ikke.
 public class LoginAndCrudTests : IDisposable
 {
     private const string Password = "Test-password-12345";
     private readonly TestApp app = new();
-    private HttpClient Client() => app.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+    private HttpClient Client() => app.CreateClient();
+    private static object Input(string username, string role = "User", string? password = Password) => new { username, role, password };
 
-    private static async Task<HttpResponseMessage> Post(HttpClient client, string path, Dictionary<string, string> fields)
+    private static async Task Login(HttpClient client, string username)
     {
-        var html = await client.GetStringAsync(path.StartsWith("/Login") ? "/Login" : "/");
-        fields["__RequestVerificationToken"] = Regex.Match(html,
-            "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value;
-        return await client.PostAsync(path, new FormUrlEncodedContent(fields));
+        var response = await client.PostAsJsonAsync("/login", new { username, password = Password });
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", data!.Token);
     }
-
-    private static Task<HttpResponseMessage> Login(HttpClient client, string username, string password = Password) =>
-        Post(client, "/Login", new() { ["Username"] = username, ["Password"] = password });
-
-    private static Dictionary<string, string> UserForm(string name, string role = "User", int id = 0) => new()
-    {
-        ["Input.Id"] = id.ToString(), ["Input.Username"] = name,
-        ["Input.Role"] = role, ["Input.Password"] = id == 0 ? Password : ""
-    };
-
-    private static string RedirectPath(HttpResponseMessage response) => response.Headers.Location!.IsAbsoluteUri
-        ? response.Headers.Location.AbsolutePath : response.Headers.Location.OriginalString.Split('?')[0];
 
     [Fact]
     public async Task LoginRequiresCorrectPassword()
     {
         using var client = Client();
-        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/")).StatusCode);
-        var wrong = await Login(client, "admin", "wrong-password");
-        Assert.Contains("Forkert brugernavn", await wrong.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.Redirect, (await Login(client, "admin")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/users")).StatusCode);
+        var wrong = await client.PostAsJsonAsync("/login", new { username = "admin", password = "wrong-password" });
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        await Login(client, "admin");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/users")).StatusCode);
     }
 
     [Fact]
-    public async Task AdminCanCreateReadUpdateAndDelete()
+    public async Task AdminHasFullCrudForAllThreeRoles()
     {
         using var client = Client();
         await Login(client, "admin");
-        Assert.Equal(HttpStatusCode.Redirect, (await Post(client, "/?handler=Save", UserForm("test-user"))).StatusCode);
-        var html = await client.GetStringAsync("/");
-        Assert.Contains("test-user", html);
-        Assert.DoesNotContain("$argon2id", html);
-        Assert.DoesNotContain(Password, html);
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = db.Users.Single(u => u.Username == "test-user");
-        Assert.StartsWith("$argon2id$", user.PasswordHash);
-        Assert.NotEqual(Password, user.PasswordHash);
-        Assert.Equal(HttpStatusCode.Redirect, (await Post(client, "/?handler=Save", UserForm("updated-user", id: user.Id))).StatusCode);
-        Assert.Contains("updated-user", await client.GetStringAsync("/"));
-        Assert.Equal(HttpStatusCode.Redirect, (await Post(client, "/?handler=Delete", new() { ["id"] = user.Id.ToString() })).StatusCode);
-        Assert.DoesNotContain("updated-user", await client.GetStringAsync("/"));
+        foreach (var role in new[] { "User", "SuperUser", "Admin" })
+        {
+            var created = await client.PostAsJsonAsync("/api/users", Input("test-" + role, role));
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            var user = await created.Content.ReadFromJsonAsync<User>();
+            var path = $"/api/users/{user!.Id}";
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(path)).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/users", Input("TEST-" + role, role))).StatusCode);
+            var json = await client.GetStringAsync("/api/users");
+            Assert.DoesNotContain("password", json.ToLowerInvariant());
+            Assert.DoesNotContain(Password, json);
+            using (var scope = app.Services.CreateScope())
+                Assert.StartsWith("$argon2id$", scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.Find(user.Id)!.PasswordHash);
+            Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(path, Input("updated-" + role, role, null))).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(path)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path)).StatusCode);
+        }
     }
 
     [Theory]
     [InlineData("User", false)]
     [InlineData("SuperUser", true)]
-    public async Task RolesAreCheckedOnTheServer(string role, bool mayCreate)
+    public async Task LowerRolesCannotManageHigherRoles(string role, bool mayCreate)
     {
         using var admin = Client();
         await Login(admin, "admin");
-        await Post(admin, "/?handler=Save", UserForm("test-account", role));
+        var root = await admin.GetFromJsonAsync<User>("/api/auth/me");
+        await admin.PostAsJsonAsync("/api/users", Input("test-account", role));
         using var client = Client();
         await Login(client, "test-account");
-        var result = await Post(client, "/?handler=Save", UserForm("new-user"));
-        Assert.Equal(mayCreate ? "/" : "/Login", RedirectPath(result));
-        // Hverken User eller SuperUser må oprette Admin.
-        var forbidden = await Post(client, "/?handler=Save", UserForm("fake-admin", "Admin"));
-        Assert.Equal("/Login", RedirectPath(forbidden));
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.False(db.Users.Any(u => u.Username == "fake-admin"));
-        Assert.Equal(mayCreate, db.Users.Any(u => u.Username == "new-user"));
+        var list = await client.GetFromJsonAsync<List<User>>("/api/users");
+        Assert.All(list!, user => Assert.Equal("User", user.Role));
+        Assert.Equal(mayCreate ? HttpStatusCode.Created : HttpStatusCode.Forbidden,
+            (await client.PostAsJsonAsync("/api/users", Input("new-user"))).StatusCode);
+        foreach (var higherRole in new[] { "SuperUser", "Admin" })
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/users", Input("fake-admin", higherRole))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/users/{root!.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/api/users/{root.Id}", Input("changed", "User", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/api/users/{root.Id}")).StatusCode);
+        if (mayCreate)
+        {
+            var normal = (await client.GetFromJsonAsync<List<User>>("/api/users"))!.Single();
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/api/users/{normal.Id}", Input(normal.Username, "Admin", null))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/users/{normal.Id}", Input("renamed", password: null))).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/users/{normal.Id}")).StatusCode);
+        }
     }
 
     public void Dispose() => app.Dispose();
+    private record LoginResponse(string Token);
 
     private class TestApp : WebApplicationFactory<Program>
     {
         private readonly string database = Path.Combine(Path.GetTempPath(), $"kvist-{Guid.NewGuid():N}.db");
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseSetting("JwtSecret", new string('a', 48));
             builder.UseSetting("BootstrapAdmin:Password", Password);
             builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={database}");
         }

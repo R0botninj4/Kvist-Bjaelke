@@ -3,6 +3,8 @@
 .env.*
 **/bin
 **/obj
+**/node_modules
+**/wwwroot
 **/*.db*
 docs
 tests

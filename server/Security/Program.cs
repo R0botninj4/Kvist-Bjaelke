@@ -1,47 +1,52 @@
 using System.Security.Claims;
+using System.Text;
 using DataAccess;
 using DataAccess.Entities;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Security.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddRazorPages();
+
+builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(
     builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db"));
 builder.Services.AddSingleton<Argon2PasswordHasher>();
+builder.Services.AddSingleton<TokenService>();
 builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    var secret = builder.Configuration["JwtSecret"];
+    if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
+        throw new InvalidOperationException("Angiv JwtSecret med mindst 32 tilfældige tegn.");
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.LoginPath = "/Login";
-        options.AccessDeniedPath = "/Login";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        // Kontoændringer gør tidligere login ugyldigt.
-        options.Events.OnValidatePrincipal = async context =>
+        ValidateIssuer = true, ValidIssuer = "kvist-bjaelke",
+        ValidateAudience = true, ValidAudience = "kvist-bjaelke",
+        ValidateLifetime = true, ClockSkew = TimeSpan.Zero,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret))
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
         {
             var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
             var id = int.Parse(context.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var user = await db.Users.FindAsync(id);
             if (user == null || context.Principal!.FindFirstValue("version") != user.SecurityVersion.ToString())
-                context.RejectPrincipal();
-        };
-    });
-
-// Docker gemmer cookie-nøgler sammen med databasen.
-var keysPath = builder.Configuration["DataProtectionKeys"];
-if (!string.IsNullOrEmpty(keysPath))
-    builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+                context.Fail("Kontoen er ændret eller slettet. Log ind igen.");
+        }
+    };
+});
 
 var app = builder.Build();
-app.UseExceptionHandler("/Error");
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapRazorPages();
+app.MapControllers();
 app.MapGet("/health", () => "OK");
 
 using (var scope = app.Services.CreateScope())
@@ -63,6 +68,4 @@ using (var scope = app.Services.CreateScope())
     }
 }
 app.Run();
-
-// Gør webprojektet tilgængeligt for C#-testprojektet.
 public partial class Program { }

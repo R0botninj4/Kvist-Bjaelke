@@ -16,4 +16,7 @@ jobs:
       - run: bun install --frozen-lockfile && bun run check && bun run build
         working-directory: client
       - run: dotnet test server/KvistBjaelke.sln -c Release
-      - run: docker build -t kvist-bjaelke .
+      - run: docker compose build
+        env:
+          JWT_SECRET: ci-build-placeholder-not-a-deployment-secret
+          ADMIN_PASSWORD: ci-build-placeholder-password

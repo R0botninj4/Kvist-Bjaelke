@@ -1,104 +1,97 @@
 # Kvist & Bjælke ApS — Part 1
 
-En simpel loginplatform til **CDS.security**. Projektet indeholder kun Part 1.
-
-Lavet med **C# / ASP.NET Core Web API**, Entity Framework Core og SQLite.
-Frontend er en enkel **React `App.tsx`**, bygget med Bun — samme grundstruktur som `MinBogliste` og `authorization-frontend-backend`.
-Der er ingen `.cshtml`- eller Python-filer.
-UI'et bruger almindelig HTML uden CSS.
-
-## Funktioner og roller
-
-| Rolle | Rettigheder |
-|---|---|
-| User | Kan læse almindelige brugere i tabellen |
-| SuperUser | Kan oprette, læse, redigere og slette almindelige brugere |
-| Admin | Kan oprette, læse, redigere og slette alle tre roller |
-
-Brugeren logger ind med brugernavn og adgangskode. Efter login vises brugertabellen.
-SuperUser og Admin har en formular til at oprette/redigere konti. Sletning skal bekræftes.
-Admin kan vælge rolle; SuperUser kan kun vælge User.
-Man kan ikke slette sin egen konto eller ændre sin egen rolle.
+Login og bruger-CRUD til CDS.security. Projektet tager udgangspunkt i `authorization-frontend-backend` og bruger samme opbygning: React med AuthProvider, C#-controllers, UserService, UserRepository, JWT og Argon2id.
 
 ## Start lokalt
 
-Kræver **.NET SDK 10**, **Bun** og PowerShell 7. Kør fra projektets rod:
+Kræver .NET SDK 10, Bun og PowerShell 7. Kør fra projektets rod i to terminaler.
+
+**Terminal 1 — backend:**
 
 ```powershell
-pwsh -File scripts/start-local.ps1
+pwsh -File scripts/start-api.ps1
 ```
 
-Åbn **http://127.0.0.1:8000**.
-Scriptet bygger React og opretter `.env` første gang med et tilfældigt admin-password og en JWT-nøgle.
-Find brugernavn og password i den lokale `.env`-fil. Filen lægges ikke på GitHub.
-Databasen `app.db` oprettes automatisk. Admin oprettes kun, når databasen er tom.
+**Terminal 2 — frontend:**
 
-Projektet kan også åbnes i Visual Studio eller Rider via `server/KvistBjaelke.sln`.
+```powershell
+cd client
+bun install
+bun run dev
+```
+
+- Frontend: **http://localhost:3500**
+- Backend og Swagger: **http://localhost:3501/swagger**
+- Admin-login findes i den lokale `.env`-fil. Scriptet opretter filen med tilfældige værdier første gang.
+
+Frontend og backend kører separat som i authorization-projektet. Der bruges ingen `wwwroot`, CSS, Python eller Razor Pages. Du ændrer frontend i `client/src/App.tsx`.
 
 ## Start med Docker
-
-Docker er med, fordi Part 1 kræver, at løsningen kan køre i en container.
 
 ```powershell
 pwsh -File scripts/setup.ps1
 docker compose up -d --build
 ```
 
-Åbn **http://localhost:8000**. Login findes i `.env`, som ved lokal opstart.
-SQLite-databasen gemmes i en Docker-volume, så kontiene bevares efter genstart.
-Port 8000 videresendes til containerens port 8080.
+Åbn http://localhost:3500. Som i originalen starter Compose en web-container og en API-container. Databasen gemmes i volumen `api-data`, så kontiene bevares ved genstart. Portene er bundet til localhost; eksemplet er beregnet til lokal kørsel. Eventuel server-/VLAN-opsætning hører til Part 2.
+
+## Roller
+
+| Rolle | Rettigheder |
+|---|---|
+| User | Se User-konti i tabellen |
+| SuperUser | Oprette, se, redigere og slette User-konti |
+| Admin | Oprette, se, redigere og slette konti med alle tre roller |
+
+API'et kontrollerer både den eksisterende og den ønskede rolle, så SuperUser ikke kan ændre en Admin eller oprette en ny Admin. Man kan ikke slette sig selv eller ændre sin egen rolle.
+
+## Hvad er ændret fra authorization-projektet?
+
+- `AuthProvider`, loginmodeller, `frontend.tsx`, password-hasheren og dens interface er overtaget fra originalen.
+- `UserRepository` og `UserService` er udvidet med hentning af én bruger, opdatering og sletning.
+- JWT'et indeholder nu også brugerens rolle, så `[Authorize(Roles = "SuperUser,Admin")]` kan bruges.
+- `UsersController` har fuld CRUD. `/register` er beskyttet og bruger den samme oprettelse som `POST /api/Users`.
+- PasswordHash er markeret `JsonIgnore`, så hashen aldrig kommer med i API-svar.
+- Input valideres, og databasen tillader ikke to identiske brugernavne. Brugernavne er case-sensitive som i originalens login.
+- Første Admin oprettes fra `.env`, når databasen er tom. Ingen credentials er hardcoded eller lagt på GitHub.
+- Logo, CSS og demo-endpoints fra frontend er fjernet.
 
 ## Sikkerhedsvalg
 
-- **Argon2id** hasher passwords med 64 MiB hukommelse, 3 iterationer og et tilfældigt salt pr. password. Databasen gemmer kun hash og salt. Passwords og hashes vises aldrig i tabellen.
-- **JWT-login** følger authorization-øvelsen: `POST /login` giver et signeret token med 30 minutters levetid. React gemmer det i `sessionStorage` og sender det som `Authorization: Bearer ...`. Serveren kontrollerer signatur, issuer, audience og udløb.
-- **Rollekontrol i C#** kontrollerer alle ændringer på serveren. En SuperUser må hverken ændre en eksisterende Admin eller tildele rollen Admin, selv ved en manipuleret formular.
-- **API'et** kræver bearer-token på alle bruger-endpoints. Login og brugerlisten deler adresse, så der ikke er behov for CORS eller automatisk afsendte login-cookies.
-- **Validering** kræver unikt brugernavn, gyldig rolle og passwords på 12–128 tegn. Ved redigering bevarer et tomt passwordfelt den gamle hash.
-- **Kontoændringer** øger et versionsnummer på kontoen. Et tidligere token afvises derefter ved næste request. Der er ingen separat sessionstabel.
+**Passwords:** Originalens Argon2id anvendes med 64 MiB hukommelse, 3 iterationer, parallelisme 4, et tilfældigt salt på 16 bytes og en hash på 32 bytes. Formatet i databasen er det samme som originalen: `hash.salt`. Sammenligning bruger `FixedTimeEquals`. Ved oprettelse/ændring kræves 12–128 tegn. Et tomt felt ved redigering sendes som `null` og bevarer det gamle password. Argon2id er valgt frem for hurtig SHA-256, fordi password-hashing skal være dyr at brute-force.
 
-Argon2id er valgt frem for almindelig SHA-256, fordi password-hashing skal være dyr at brute-force.
-JWT er valgt, fordi det er den metode, der bruges i authorization-øvelsen.
-SQLite er valgt, fordi opgaven kan løses uden en separat databaseserver.
-Til rigtig drift skal HTTP suppleres med HTTPS. Eksemplet har ikke MFA, password recovery eller rate limiting.
-Logout fjerner browserens token; et allerede kopieret token kan stadig bruges indtil udløb eller en kontoændring.
-`sessionStorage` kan læses af JavaScript ved XSS, så det er vigtigt ikke at indsætte brugerinput som rå HTML. React viser her input som almindelig tekst.
+**Login:** Som i originalen udstedes et signeret JWT med én times levetid. `AuthProvider` gemmer det i `sessionStorage`. API'et validerer signatur, issuer, audience og udløb. Et kopieret JWT kan bruges til udløb, også efter logout eller passwordændring. Kontrol af den aktuelle rolle og konto i databasen sikrer dog, at et gammelt token ikke giver tidligere skriverettigheder efter demotion eller sletning. Efter en forfremmelse skal man logge ind igen for at få et JWT med den nye rolle.
 
-## C#-tests
+`sessionStorage` er tilgængelig for JavaScript ved XSS; React viser her brugerdata som tekst. HttpOnly-cookies er et muligt alternativ. Til rigtig drift skal HTTP suppleres med HTTPS. Eksemplet har ikke MFA, rate limiting eller password recovery. CORS tillader kun frontendens lokale adresser på port 3500.
+
+## Kodestruktur
+
+```text
+client/src/auth/AuthProvider.tsx                     Login, token og logout
+client/src/App.tsx                                   Loginformular og bruger-CRUD
+server/Security/Controller/                          LoginController og UsersController
+server/Security/Services/Implementation/UserService.cs
+server/DataAccess/Repositories/Implementation/UserRepository.cs
+server/Security/Services/Security/                    Originalens password-hasher
+server/Security/Services/Authorization/               Originalens JWT-service
+server/Security/Startup.cs                           Authentication og services
+server/DataAccess/Startup.cs                         Database og repository
+```
+
+## Tests
 
 ```powershell
 dotnet test server/KvistBjaelke.sln -c Release
+cd client
+bun run check
+bun run build
 ```
 
-Testene i `server/Security.Tests` kontrollerer login, CRUD for alle tre roller, hashing og rollekontrol gennem API'et med en midlertidig database. Din egen database ændres ikke.
-GitHub Actions kører de samme tests og bygger Docker-imaget.
-
-## Projektets filer
-
-```text
-client/src/App.tsx            Login, CRUD-formular og brugertabel
-server/Security/Controllers/  LoginController og UsersController
-server/Security/Dtos/         Input til login og CRUD
-server/Security/Services/     Password-hashing og JWT
-server/DataAccess/             User-model og SQLite-database
-server/Security.Tests/         Tests skrevet i C#
-scripts/                      Opsætning og lokal start
-Dockerfile / compose.yaml     Docker-opstart
-```
-
-## API-endpoints
-
-`POST /login` logger ind. `GET /api/auth/me` giver den aktuelle bruger.
-Bruger-CRUD ligger på `GET/POST /api/users` og `GET/PUT/DELETE /api/users/{id}`.
-Alle bruger-endpoints kræver login; skrivehandlinger kræver SuperUser eller Admin og kontrollerer også målkontoens rolle.
+C#-testene bruger en separat, midlertidig database og kontrollerer login, CRUD for alle roller, skjulte password-hashes og afvisning af ulovlige rolleændringer. GitHub Actions kører testene og bygger begge Docker-images.
 
 ## Screenshots
 
-Fiktive eksempelkonti fra den lokale løsning. En ny database indeholder kun admin.
-
 ![Login](docs/screenshots/login.png)
-![Admin](docs/screenshots/admin.png)
-![User med læseadgang](docs/screenshots/user.png)
-![SuperUser med CRUD](docs/screenshots/superuser.png)
+![Brugeradministration](docs/screenshots/admin.png)
 
 Kildekode: [GitHub](https://github.com/R0botninj4/Kvist-Bjaelke-Part1).

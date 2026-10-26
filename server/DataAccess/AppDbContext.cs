@@ -3,13 +3,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext : DbContext
 {
-    public DbSet<User> Users => Set<User>();
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    protected override void OnModelCreating(ModelBuilder model)
+    public DbSet<User> Users { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        model.Entity<User>().HasIndex(u => u.NormalizedUsername).IsUnique();
-        model.Entity<User>().Property(u => u.Username).HasMaxLength(50);
+        modelBuilder.Entity<User>().HasIndex(user => user.Username).IsUnique();
     }
 }

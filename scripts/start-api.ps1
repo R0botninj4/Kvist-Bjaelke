@@ -9,15 +9,9 @@ try {
     $env:BootstrapAdmin__Username = $env:ADMIN_USERNAME
     $env:JwtSecret = $env:JWT_SECRET
     $env:BootstrapAdmin__Password = $env:ADMIN_PASSWORD
-    $env:ASPNETCORE_URLS = 'http://127.0.0.1:8000'
+    $env:ASPNETCORE_ENVIRONMENT = 'Development'
+    $env:ASPNETCORE_URLS = 'http://localhost:3501'
     $env:ConnectionStrings__DefaultConnection = "Data Source=$projectRoot/app.db"
-    Push-Location client
-    try {
-        bun install --frozen-lockfile
-        if ($LASTEXITCODE -ne 0) { throw 'bun install fejlede' }
-        bun run build
-        if ($LASTEXITCODE -ne 0) { throw 'Frontend-build fejlede' }
-    } finally { Pop-Location }
     dotnet run --project server/Security -c Release --no-launch-profile
     if ($LASTEXITCODE -ne 0) { throw 'Serveren kunne ikke starte' }
 } finally { Pop-Location }

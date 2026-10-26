@@ -50,15 +50,23 @@ public class LoginAndCrudTests : IDisposable
             var user = await created.Content.ReadFromJsonAsync<User>();
             var path = $"/api/users/{user!.Id}";
             Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(path)).StatusCode);
-            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/users", Input("TEST-" + role, role))).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/users", Input("test-" + role, role))).StatusCode);
             var json = await client.GetStringAsync("/api/users");
             Assert.DoesNotContain("password", json.ToLowerInvariant());
             Assert.DoesNotContain(Password, json);
             using (var scope = app.Services.CreateScope())
-                Assert.StartsWith("$argon2id$", scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.Find(user.Id)!.PasswordHash);
+                Assert.Equal(2, scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.Find(user.Id)!.PasswordHash.Split('.').Length);
             Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(path, Input("updated-" + role, role, null))).StatusCode);
+            using var oldLogin = Client();
+            if (role == "Admin")
+            {
+                await Login(oldLogin, "updated-Admin");
+                await client.PutAsJsonAsync(path, Input("updated-Admin", "User", null));
+                Assert.Equal(HttpStatusCode.Forbidden, (await oldLogin.PostAsJsonAsync("/api/users", Input("not-allowed"))).StatusCode);
+            }
             Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(path)).StatusCode);
             Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path)).StatusCode);
+            if (role == "Admin") Assert.Equal(HttpStatusCode.Unauthorized, (await oldLogin.GetAsync("/api/users")).StatusCode);
         }
     }
 
@@ -97,6 +105,10 @@ public class LoginAndCrudTests : IDisposable
     private class TestApp : WebApplicationFactory<Program>
     {
         private readonly string database = Path.Combine(Path.GetTempPath(), $"kvist-{Guid.NewGuid():N}.db");
+        public TestApp()
+        {
+            Environment.SetEnvironmentVariable("JwtSecret", new string('a', 48));
+        }
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("JwtSecret", new string('a', 48));

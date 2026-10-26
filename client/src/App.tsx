@@ -1,20 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useAuth } from "./auth/AuthProvider";
 
-type Role = "User" | "SuperUser" | "Admin";
-type User = { id: number; username: string; role: Role };
+type User = { id: number; username: string; role: string };
 
 export function App() {
-    const [token, setToken] = useState<string | null>(sessionStorage.getItem("token"));
-    const [user, setUser] = useState<User | null>(null);
+    const { token, login, logout } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
-    const [role, setRole] = useState<Role>("User");
+    const [role, setRole] = useState("User");
     const [editId, setEditId] = useState<number | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
-    const [busy, setBusy] = useState(false);
-    const [loading, setLoading] = useState(!!token);
 
     function clearForm() {
         setUsername("");
@@ -23,156 +21,145 @@ export function App() {
         setEditId(null);
     }
 
-    function logout() {
-        sessionStorage.removeItem("token");
-        setToken(null);
-        setUser(null);
-        setUsers([]);
-        setMessage("");
-        clearForm();
-    }
-
-    async function sendRequest(path: string, method = "GET", body?: object) {
-        const response = await fetch(path, {
-            method,
-            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: body === undefined ? undefined : JSON.stringify(body)
-        });
-        if (response.status === 401) {
-            logout();
-            throw new Error(path === "/login" ? "Forkert brugernavn eller adgangskode." : "Log ind igen.");
-        }
-        if (response.status === 403) {
-            throw new Error("Du har ikke adgang til denne handling.");
-        }
-        if (response.status === 409) {
-            throw new Error("Brugernavnet er allerede i brug.");
-        }
-        if (!response.ok) {
-            throw new Error("Handlingen mislykkedes. Kontrollér oplysningerne.");
-        }
-        return response;
-    }
-
     async function getUsers() {
-        const response = await sendRequest("/api/users");
+        const response = await fetch("http://localhost:3501/api/Users", {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.status === 401) { logout(); return; }
+        if (!response.ok) throw new Error("Brugerne kunne ikke hentes.");
         setUsers(await response.json());
     }
 
-    async function loadUser() {
-        try {
-            const response = await sendRequest("/api/auth/me");
-            setUser(await response.json());
-            await getUsers();
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
-        } finally {
-            setLoading(false);
-        }
-    }
-
     useEffect(() => {
-        if (token) {
-            setLoading(true);
-            loadUser();
+        if (!token) {
+            setCurrentUser(null);
+            setUsers([]);
+            return;
         }
+        async function loadUser() {
+            try {
+                const response = await fetch("http://localhost:3501/api/auth/me", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.status === 401) { logout(); return; }
+                if (!response.ok) throw new Error("Brugeren kunne ikke hentes.");
+                setCurrentUser(await response.json());
+                await getUsers();
+            } catch (error) {
+                setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+            }
+        }
+        loadUser();
     }, [token]);
 
-    async function login(event: FormEvent) {
+    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        setBusy(true);
         setError("");
+        setIsLoading(true);
         try {
-            const response = await sendRequest("/login", "POST", { username, password });
-            const data = await response.json();
-            sessionStorage.setItem("token", data.token);
-            setToken(data.token);
-            setUser(data.user);
+            await login({ username, password });
             clearForm();
         } catch (error) {
-            setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
+            setError(error instanceof Error ? error.message : "Login failed.");
         } finally {
-            setBusy(false);
+            setIsLoading(false);
         }
     }
 
-    async function saveUser(event: FormEvent) {
+    async function saveUser(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        setBusy(true);
         setError("");
-        setMessage("");
+        setIsLoading(true);
+        let url = "http://localhost:3501/api/Users";
+        let method = "POST";
+        if (editId !== null) {
+            url += `/${editId}`;
+            method = "PUT";
+        }
         try {
-            const data = { username, password: password || null, role };
-            if (editId === null) {
-                await sendRequest("/api/users", "POST", data);
-            } else {
-                await sendRequest(`/api/users/${editId}`, "PUT", data);
-            }
+            const response = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ username, password: password || null, role })
+            });
+            if (response.status === 401) { logout(); return; }
+            if (response.status === 409) throw new Error("Brugernavnet er allerede i brug.");
+            if (!response.ok) throw new Error("Brugeren kunne ikke gemmes. Kontrollér oplysninger og rolle.");
             clearForm();
             await getUsers();
-            setMessage("Brugeren er gemt.");
         } catch (error) {
             setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
         } finally {
-            setBusy(false);
+            setIsLoading(false);
         }
     }
 
     function editUser(user: User) {
         setUsername(user.username);
-        setRole(user.role);
         setPassword("");
+        setRole(user.role);
         setEditId(user.id);
-        setMessage("");
     }
 
     async function deleteUser(user: User) {
         if (!confirm(`Vil du slette ${user.username}?`)) return;
-        setBusy(true);
         setError("");
-        setMessage("");
+        setIsLoading(true);
         try {
-            await sendRequest(`/api/users/${user.id}`, "DELETE");
+            const response = await fetch(`http://localhost:3501/api/Users/${user.id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.status === 401) { logout(); return; }
+            if (!response.ok) throw new Error("Brugeren kunne ikke slettes.");
             if (editId === user.id) clearForm();
             await getUsers();
-            setMessage("Brugeren er slettet.");
         } catch (error) {
             setError(error instanceof Error ? error.message : "Serveren kan ikke kontaktes.");
         } finally {
-            setBusy(false);
+            setIsLoading(false);
         }
     }
 
-    if (loading) return <p>Henter brugere…</p>;
-    return <main>
-        <h1>Kvist & Bjælke</h1>
-        {error && <p role="alert">{error}</p>}
-        {message && <p role="status">{message}</p>}
-        {!user ? <form onSubmit={login}>
-            <h2>Log ind</h2><fieldset disabled={busy}>
-                <p><label htmlFor="username">Brugernavn</label><br /><input id="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={50} autoComplete="username" /></p>
-                <p><label htmlFor="password">Adgangskode</label><br /><input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} autoComplete="current-password" /></p>
-                <button>{busy ? "Logger ind…" : "Log ind"}</button>
-            </fieldset>
-        </form> : <>
-            <p>{user.username} · {user.role} <button onClick={logout} disabled={busy}>Log ud</button></p>
-            <h2>Brugere</h2>
-            {user.role !== "User" && <form onSubmit={saveUser}>
-                <h3>{editId === null ? "Opret bruger" : "Rediger bruger"}</h3><fieldset disabled={busy}>
-                    <p><label htmlFor="edit-username">Brugernavn</label><br /><input id="edit-username" value={username} onChange={e => setUsername(e.target.value)} required pattern="[a-zA-Z0-9._-]{3,50}" /></p>
-                    <p><label htmlFor="edit-password">{editId === null ? "Adgangskode" : "Ny adgangskode (valgfri)"}</label><br /><input id="edit-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required={editId === null} minLength={12} maxLength={128} autoComplete="new-password" /></p>
-                    <p><label htmlFor="role">Rolle</label><br /><select id="role" value={role} onChange={e => setRole(e.target.value as Role)} disabled={user.role !== "Admin"}>
-                        <option>User</option>{user.role === "Admin" && <><option>SuperUser</option><option>Admin</option></>}
-                    </select></p>
-                    <button>{busy ? "Gemmer…" : "Gem"}</button> <button type="button" onClick={clearForm}>Annuller</button>
-                </fieldset>
-            </form>}
-            <table><thead><tr><th>Brugernavn</th><th>Rolle</th><th>Handlinger</th></tr></thead><tbody>
-                {users.map(target => <tr key={target.id}><td>{target.username}</td><td>{target.role}</td><td>
-                    {user.role !== "User" ? <><button onClick={() => editUser(target)} disabled={busy}>Rediger</button> {target.id !== user.id && <button onClick={() => deleteUser(target)} disabled={busy}>Slet</button>}</> : "Kun læsning"}
-                </td></tr>)}
-                {users.length === 0 && <tr><td colSpan={3}>Ingen brugere endnu.</td></tr>}
-            </tbody></table>
-        </>}
-    </main>;
+    return (
+        <div>
+            <h1>Kvist & Bjælke</h1>
+            {error && <p role="alert">{error}</p>}
+            {!token ? (
+                <form onSubmit={handleSubmit}>
+                    <h2>Login</h2>
+                    <fieldset disabled={isLoading}>
+                        <p><label htmlFor="username">Username</label><br /><input id="username" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} required maxLength={50} /></p>
+                        <p><label htmlFor="password">Password</label><br /><input id="password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required maxLength={128} /></p>
+                        <button>{isLoading ? "Logging in…" : "Log in"}</button>
+                    </fieldset>
+                </form>
+            ) : (
+                <div>
+                    <p>{currentUser?.username} · {currentUser?.role} <button disabled={isLoading} onClick={() => { logout(); clearForm(); setError(""); }}>Log out</button></p>
+                    {currentUser && currentUser.role !== "User" && (
+                        <form onSubmit={saveUser}>
+                            <h2>{editId === null ? "Opret bruger" : "Rediger bruger"}</h2>
+                            <fieldset disabled={isLoading}>
+                                <p><label htmlFor="edit-username">Brugernavn</label><br /><input id="edit-username" value={username} onChange={event => setUsername(event.target.value)} required pattern="[a-zA-Z0-9._-]{3,50}" /></p>
+                                <p><label htmlFor="edit-password">{editId === null ? "Adgangskode" : "Ny adgangskode (valgfri)"}</label><br /><input id="edit-password" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} required={editId === null} minLength={12} maxLength={128} /></p>
+                                <p><label htmlFor="role">Rolle</label><br /><select id="role" value={role} onChange={event => setRole(event.target.value)} disabled={currentUser.role !== "Admin"}><option>User</option>{currentUser.role === "Admin" && <><option>SuperUser</option><option>Admin</option></>}</select></p>
+                                <button>Gem</button> <button type="button" onClick={clearForm}>Annuller</button>
+                            </fieldset>
+                        </form>
+                    )}
+                    <h2>Brugere</h2>
+                    <table>
+                        <thead><tr><th>Brugernavn</th><th>Rolle</th><th>Handlinger</th></tr></thead>
+                        <tbody>{users.map(user => (
+                            <tr key={user.id}>
+                                <td>{user.username}</td><td>{user.role}</td>
+                                <td>{currentUser && currentUser.role !== "User" ? <><button disabled={isLoading} onClick={() => editUser(user)}>Rediger</button> {user.id !== currentUser.id && <button disabled={isLoading} onClick={() => deleteUser(user)}>Slet</button>}</> : "Kun læsning"}</td>
+                            </tr>
+                        ))}</tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
 }

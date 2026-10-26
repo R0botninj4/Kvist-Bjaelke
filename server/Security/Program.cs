@@ -1,53 +1,30 @@
-using System.Security.Claims;
-using System.Text;
 using DataAccess;
-using DataAccess.Entities;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using Security;
+using Security.Dtos;
 using Security.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.ConfigureInfrastructureServices(
+    builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db");
+builder.Services.ConfigureDomainServices(builder.Configuration["JwtSecret"]!);
 builder.Services.AddControllers();
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(
-    builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db"));
-builder.Services.AddSingleton<Argon2PasswordHasher>();
-builder.Services.AddSingleton<TokenService>();
-builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-    var secret = builder.Configuration["JwtSecret"];
-    if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
-        throw new InvalidOperationException("Angiv JwtSecret med mindst 32 tilfældige tegn.");
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true, ValidIssuer = "kvist-bjaelke",
-        ValidateAudience = true, ValidAudience = "kvist-bjaelke",
-        ValidateLifetime = true, ClockSkew = TimeSpan.Zero,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret))
-    };
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = async context =>
-        {
-            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-            var id = int.Parse(context.Principal!.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var user = await db.Users.FindAsync(id);
-            if (user == null || context.Principal!.FindFirstValue("version") != user.SecurityVersion.ToString())
-                context.Fail("Kontoen er ændret eller slettet. Log ind igen.");
-        }
-    };
-});
+builder.Services.AddCors(options => options.AddPolicy("CorsPolicy", policy => policy
+    .WithOrigins("http://localhost:3500", "http://127.0.0.1:3500")
+    .AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
-app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
-app.MapGet("/health", () => "OK");
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.MapGet("/", () => Results.Redirect("/swagger"));
+}
 
 using (var scope = app.Services.CreateScope())
 {
@@ -58,14 +35,16 @@ using (var scope = app.Services.CreateScope())
         var password = builder.Configuration["BootstrapAdmin:Password"];
         if (string.IsNullOrWhiteSpace(password) || password.Length < 12 || password.Length > 128)
             throw new InvalidOperationException("Angiv BootstrapAdmin__Password med 12-128 tegn.");
-        var username = builder.Configuration["BootstrapAdmin:Username"] ?? "admin";
-        db.Users.Add(new User
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        userService.TryRegister(new CreateUserRequest
         {
-            Username = username, NormalizedUsername = username.ToUpperInvariant(),
-            Role = "Admin", PasswordHash = Argon2PasswordHasher.Hash(password)
+            Username = builder.Configuration["BootstrapAdmin:Username"] ?? "admin",
+            Password = password,
+            Role = "Admin"
         });
-        db.SaveChanges();
     }
 }
+app.MapControllers();
+app.MapGet("/health", () => "OK");
 app.Run();
 public partial class Program { }

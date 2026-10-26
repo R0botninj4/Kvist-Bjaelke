@@ -2,13 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Security.Dtos;
 
-public class LoginRequest
-{
-    [Required, StringLength(50)] public string Username { get; set; } = "";
-    [Required, StringLength(128)] public string Password { get; set; } = "";
-}
-
-public class UserRequest
+public class UpdateUserRequest
 {
     [Required, RegularExpression(@"^[a-zA-Z0-9._-]{3,50}$")]
     public string Username { get; set; } = "";

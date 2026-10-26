@@ -4,16 +4,12 @@ services:
     ports:
       - "8000:8080"
     environment:
-      JwtSecret: ${JWT_SECRET:?Create .env from .env.example and set JWT_SECRET}
       BootstrapAdmin__Username: ${ADMIN_USERNAME:-admin}
       BootstrapAdmin__Password: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       ASPNETCORE_ENVIRONMENT: Production
+      DataProtectionKeys: /data/keys
     volumes:
       - app-data:/data
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
 volumes:
   app-data:

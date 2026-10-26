@@ -9,14 +9,8 @@ public class User
     public string NormalizedUsername { get; set; } = "";
     [JsonIgnore] public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "User";
+    // Øges ved ændringer, så gamle login-cookies bliver ugyldige.
     public int SecurityVersion { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
-public class LoginSession
-{
-    public string Id { get; set; } = "";
-    public int UserId { get; set; }
-    public User User { get; set; } = null!;
-    public DateTime ExpiresAt { get; set; }
-}

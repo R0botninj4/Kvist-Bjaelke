@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Security", "Security\Securi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataAccess", "DataAccess\DataAccess.csproj", "{238F7AF9-617E-40AB-ACA8-D98509C7331B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Security.Tests", "Security.Tests\Security.Tests.csproj", "{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{238F7AF9-617E-40AB-ACA8-D98509C7331B}.Release|x64.Build.0 = Release|Any CPU
 		{238F7AF9-617E-40AB-ACA8-D98509C7331B}.Release|x86.ActiveCfg = Release|Any CPU
 		{238F7AF9-617E-40AB-ACA8-D98509C7331B}.Release|x86.Build.0 = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|x64.Build.0 = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Debug|x86.Build.0 = Debug|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|x64.ActiveCfg = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|x64.Build.0 = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|x86.ActiveCfg = Release|Any CPU
+		{8F5CDEA7-D0D7-4F56-937A-9683F94249D7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

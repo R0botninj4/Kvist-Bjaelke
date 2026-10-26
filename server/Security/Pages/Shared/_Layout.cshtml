@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · Kvist & Bjælke</title>
+    <link rel="stylesheet" href="~/site.css" />
+</head>
+<body>
+    <header>
+        <a asp-page="/Index" class="brand">Kvist & Bjælke <small>BRUGERADMINISTRATION</small></a>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <div class="account">
+                <span>@User.Identity.Name · @User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                <form method="post" asp-page="/Index" asp-page-handler="Logout"><button class="secondary">Log ud</button></form>
+            </div>
+        }
+    </header>
+    <main>@RenderBody()</main>
+    <footer>Kvist & Bjælke ApS · Part 1 / CDS.security</footer>
+</body>
+</html>

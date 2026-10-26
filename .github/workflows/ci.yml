@@ -1,44 +1,14 @@
-name: Build and security integration tests
-on:
-  push:
-  pull_request:
+name: Build og test C#
+on: [push, pull_request]
 permissions:
   contents: read
 jobs:
-  verify:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install and build React
-        working-directory: client
-        run: bun install --frozen-lockfile && bun run build && bun audit
-      - name: Build API
-        run: dotnet build server/Security/Security.csproj -c Release
-      - name: Test API, roles, hashes, sessions and persistence
-        run: python tests/integration.py
-      - name: Build Docker image
-        run: docker build -t kvist-bjaelke:test .
-      - name: Test the actual container over HTTP
-        shell: bash
-        run: |
-          export JwtSecret="$(openssl rand -hex 48)"
-          export BootstrapAdmin__Password="$(openssl rand -hex 24)"
-          export TEST_ADMIN_PASSWORD="$BootstrapAdmin__Password"
-          docker run -d --name kvist-test -p 8000:8080 -e JwtSecret -e BootstrapAdmin__Password kvist-bjaelke:test
-          for attempt in $(seq 1 60); do
-            if curl -fsS http://localhost:8000/health; then break; fi
-            sleep 1
-          done
-          python tests/integration.py --url http://localhost:8000
-      - name: Container logs on failure
-        if: failure()
-        run: docker logs kvist-test || true
+      - run: dotnet test server/KvistBjaelke.sln -c Release
+      - run: docker build -t kvist-bjaelke .

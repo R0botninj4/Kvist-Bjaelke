@@ -2,10 +2,8 @@
 @model LoginModel
 @{ ViewData["Title"] = "Log ind"; }
 
-<section class="login card">
-    <span class="eyebrow">MEDARBEJDERPORTAL</span>
+<section class="login">
     <h1>Log ind</h1>
-    <p>Brug din konto fra Kvist & Bjælke.</p>
     <form method="post">
         <div asp-validation-summary="All" class="error" role="alert"></div>
         <label asp-for="Username">Brugernavn</label>

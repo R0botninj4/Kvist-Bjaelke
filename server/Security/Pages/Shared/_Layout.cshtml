@@ -8,16 +8,15 @@
 </head>
 <body>
     <header>
-        <a asp-page="/Index" class="brand">Kvist & Bjælke <small>BRUGERADMINISTRATION</small></a>
+        <a asp-page="/Index">Kvist & Bjælke</a>
         @if (User.Identity?.IsAuthenticated == true)
         {
             <div class="account">
                 <span>@User.Identity.Name · @User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
-                <form method="post" asp-page="/Index" asp-page-handler="Logout"><button class="secondary">Log ud</button></form>
+                <form method="post" asp-page="/Index" asp-page-handler="Logout"><button>Log ud</button></form>
             </div>
         }
     </header>
     <main>@RenderBody()</main>
-    <footer>Kvist & Bjælke ApS · Part 1 / CDS.security</footer>
 </body>
 </html>

@@ -2,15 +2,13 @@
 @model IndexModel
 @{ ViewData["Title"] = "Brugere"; }
 
-<div class="heading">
-    <div><span class="eyebrow">MEDARBEJDERPORTAL</span><h1>Brugere</h1><p>Overblik over konti og deres adgang.</p></div>
-    @if (Model.CanEdit) { <a class="button" asp-page="Index" asp-route-create="true">Opret bruger</a> }
-</div>
+<h1>Brugere</h1>
+@if (Model.CanEdit) { <a asp-page="Index" asp-route-create="true">Opret bruger</a> }
 @if (Model.Message != null) { <p class="success" role="status">@Model.Message</p> }
 
 @if (Model.ShowForm)
 {
-    <section class="card editor">
+    <section class="editor">
         <h2>@(Model.Input.Id == 0 ? "Opret bruger" : "Rediger bruger")</h2>
         <form method="post" asp-page-handler="Save">
             <div asp-validation-summary="All" class="error" role="alert"></div>
@@ -29,12 +27,12 @@
             <label asp-for="Input.Password">@(Model.Input.Id == 0 ? "Adgangskode" : "Ny adgangskode (valgfri)")</label>
             <input name="Input.Password" id="Input_Password" type="password" minlength="12" maxlength="128" autocomplete="new-password" />
             <small>12-128 tegn. Ved redigering kan feltet være tomt for at beholde adgangskoden.</small>
-            <div class="actions"><button>Gem</button><a class="button secondary" asp-page="Index">Annuller</a></div>
+            <div class="actions"><button>Gem</button><a asp-page="Index">Annuller</a></div>
         </form>
     </section>
 }
 
-<section class="card table-wrap">
+<section class="table-wrap">
     <table>
         <thead><tr><th>Brugernavn</th><th>Rolle</th><th>Oprettet</th><th>Handlinger</th></tr></thead>
         <tbody>
@@ -42,7 +40,7 @@
         {
             <tr>
                 <td>@user.Username @(user.Id == Model.CurrentUserId ? "(dig)" : "")</td>
-                <td><span class="badge">@user.Role</span></td>
+                <td>@user.Role</td>
                 <td>@user.CreatedAt.ToString("dd-MM-yyyy")</td>
                 <td>
                     @if (Model.CanEdit)
@@ -55,7 +53,7 @@
                                     <form method="post" asp-page-handler="Delete">
                                         <input type="hidden" name="id" value="@user.Id" />
                                         <span>Slet @user.Username permanent?</span>
-                                        <button class="danger">Bekræft sletning</button>
+                                        <button>Bekræft sletning</button>
                                     </form>
                                 </details>
                             }

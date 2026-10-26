@@ -160,7 +160,9 @@ Testscriptet starter en rigtig ASP.NET Core-server på en ledig port med en midl
 
 **Lokal verifikation 26. oktober 2026:** frontend og backend bygger; backend har 0 warnings/fejl; frontend-audit har ingen kendte sårbarheder; **104 HTTP-/databasekontroller består**. Testene dækker hele rollematricen, CRUD, dubletter, ugyldigt input, udelukkelse af hashes fra svar, unikke salts, ændret password, tokenmanipulation, udløb, issuer/audience, logout, sletning, demotion, rate limit og persistens ved genstart. Browserkontrollen omfatter login, bevaret login efter reload, brugeroversigt, søgning, dialogs og visning med begrænsede roller.
 
-GitHub Actions bygger også Docker-imaget og kører API-testene mod en frisk container. Eksternt containertest springer databaseinspektion, servergenstart og signering af syntetiske testtokens over, da processen/nøglen tilhører containeren. Se den konkrete Actions-kørsel for resultatet.
+GitHub Actions bygger også Docker-imaget og kører API-testene mod en frisk container. **Både Docker-build og containertest er bestået** i [den første CI-kørsel](https://github.com/R0botninj4/Kvist-Bjaelke-Part1/actions/runs/40296740997). Eksternt containertest springer databaseinspektion, servergenstart og signering af syntetiske testtokens over, da processen/nøglen tilhører containeren. Den seneste kørsel kan ses under repositoryets Actions-fane.
+
+Docker Desktop på udviklingsmaskinen fejlede under opstart med en fejl i sin inference-manager. Derfor blev containeren verificeret på GitHubs Ubuntu-runner, mens den lokale browserkontrol brugte .NET direkte. Compose-konfigurationen er valideret lokalt. Docker Desktop-fejlen er et separat miljøproblem; der er ikke nulstillet eller slettet Docker-data.
 
 ### Screenshots
 

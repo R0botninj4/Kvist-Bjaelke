@@ -4,4 +4,10 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { App } from "./App";
 import "./style.css";
 
-createRoot(document.getElementById("root")!).render(<StrictMode><AuthProvider><App /></AuthProvider></StrictMode>);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </StrictMode>,
+);

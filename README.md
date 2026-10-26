@@ -5,6 +5,7 @@ En simpel loginplatform til **CDS.security**. Projektet indeholder kun Part 1.
 Lavet med **C# / ASP.NET Core Web API**, Entity Framework Core og SQLite.
 Frontend er en enkel **React `App.tsx`**, bygget med Bun — samme grundstruktur som `MinBogliste` og `authorization-frontend-backend`.
 Der er ingen `.cshtml`- eller Python-filer.
+UI'et bruger almindelig HTML uden CSS.
 
 ## Funktioner og roller
 

@@ -99,12 +99,12 @@ export function App() {
     if (loading) return <p>Henter brugere…</p>;
     return <main>
         <h1>Kvist & Bjælke</h1>
-        {error && <p role="alert" className="error">{error}</p>}
+        {error && <p role="alert">{error}</p>}
         {message && <p role="status">{message}</p>}
         {!user ? <form onSubmit={login}>
             <h2>Log ind</h2><fieldset disabled={busy}>
-                <label htmlFor="username">Brugernavn</label><input id="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={50} autoComplete="username" />
-                <label htmlFor="password">Adgangskode</label><input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} autoComplete="current-password" />
+                <p><label htmlFor="username">Brugernavn</label><br /><input id="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={50} autoComplete="username" /></p>
+                <p><label htmlFor="password">Adgangskode</label><br /><input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required maxLength={128} autoComplete="current-password" /></p>
                 <button>{busy ? "Logger ind…" : "Log ind"}</button>
             </fieldset>
         </form> : <>
@@ -112,20 +112,20 @@ export function App() {
             <h2>Brugere</h2>
             {user.role !== "User" && <form onSubmit={saveUser}>
                 <h3>{editId === null ? "Opret bruger" : "Rediger bruger"}</h3><fieldset disabled={busy}>
-                    <label htmlFor="edit-username">Brugernavn</label><input id="edit-username" value={username} onChange={e => setUsername(e.target.value)} required pattern="[a-zA-Z0-9._-]{3,50}" />
-                    <label htmlFor="edit-password">{editId === null ? "Adgangskode" : "Ny adgangskode (valgfri)"}</label><input id="edit-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required={editId === null} minLength={12} maxLength={128} autoComplete="new-password" />
-                    <label htmlFor="role">Rolle</label><select id="role" value={role} onChange={e => setRole(e.target.value as Role)} disabled={user.role !== "Admin"}>
+                    <p><label htmlFor="edit-username">Brugernavn</label><br /><input id="edit-username" value={username} onChange={e => setUsername(e.target.value)} required pattern="[a-zA-Z0-9._-]{3,50}" /></p>
+                    <p><label htmlFor="edit-password">{editId === null ? "Adgangskode" : "Ny adgangskode (valgfri)"}</label><br /><input id="edit-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required={editId === null} minLength={12} maxLength={128} autoComplete="new-password" /></p>
+                    <p><label htmlFor="role">Rolle</label><br /><select id="role" value={role} onChange={e => setRole(e.target.value as Role)} disabled={user.role !== "Admin"}>
                         <option>User</option>{user.role === "Admin" && <><option>SuperUser</option><option>Admin</option></>}
-                    </select>
+                    </select></p>
                     <button>{busy ? "Gemmer…" : "Gem"}</button> <button type="button" onClick={clearForm}>Annuller</button>
                 </fieldset>
             </form>}
-            <div className="table-wrap"><table><thead><tr><th>Brugernavn</th><th>Rolle</th><th>Handlinger</th></tr></thead><tbody>
+            <table><thead><tr><th>Brugernavn</th><th>Rolle</th><th>Handlinger</th></tr></thead><tbody>
                 {users.map(target => <tr key={target.id}><td>{target.username}</td><td>{target.role}</td><td>
                     {user.role !== "User" ? <><button onClick={() => editUser(target)} disabled={busy}>Rediger</button> {target.id !== user.id && <button onClick={() => deleteUser(target)} disabled={busy}>Slet</button>}</> : "Kun læsning"}
                 </td></tr>)}
                 {users.length === 0 && <tr><td colSpan={3}>Ingen brugere endnu.</td></tr>}
-            </tbody></table></div>
+            </tbody></table>
         </>}
     </main>;
 }

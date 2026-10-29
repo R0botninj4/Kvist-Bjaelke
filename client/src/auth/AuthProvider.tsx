@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let response: Response;
 
         try {
-            response = await fetch("http://localhost:3501/login", {
+            response = await fetch("/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(request),

@@ -16,7 +16,12 @@ jobs:
       - run: bun install --frozen-lockfile && bun run check && bun run build
         working-directory: client
       - run: dotnet test server/KvistBjaelke.sln -c Release
-      - run: docker compose build
+      - run: |
+          docker compose up -d --build
+          curl --fail --retry 30 --retry-connrefused --retry-delay 2 http://localhost:8000/health
+          curl --fail http://localhost:8000/ > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/Users)" = "401"
+          curl --fail -H 'Content-Type: application/json' -d '{"username":"admin","password":"ci-build-placeholder-password"}' http://localhost:8000/login | jq -e '.token | type == "string"'
         env:
           JWT_SECRET: ci-build-placeholder-not-a-deployment-secret
           ADMIN_PASSWORD: ci-build-placeholder-password

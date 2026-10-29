@@ -22,7 +22,7 @@ export function App() {
     }
 
     async function getUsers() {
-        const response = await fetch("http://localhost:3501/api/Users", {
+        const response = await fetch("/api/Users", {
             headers: { Authorization: `Bearer ${token}` }
         });
         if (response.status === 401) { logout(); return; }
@@ -38,7 +38,7 @@ export function App() {
         }
         async function loadUser() {
             try {
-                const response = await fetch("http://localhost:3501/api/auth/me", {
+                const response = await fetch("/api/auth/me", {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 if (response.status === 401) { logout(); return; }
@@ -70,7 +70,7 @@ export function App() {
         event.preventDefault();
         setError("");
         setIsLoading(true);
-        let url = "http://localhost:3501/api/Users";
+        let url = "/api/Users";
         let method = "POST";
         if (editId !== null) {
             url += `/${editId}`;
@@ -106,7 +106,7 @@ export function App() {
         setError("");
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:3501/api/Users/${user.id}`, {
+            const response = await fetch(`/api/Users/${user.id}`, {
                 method: "DELETE",
                 headers: { Authorization: `Bearer ${token}` }
             });

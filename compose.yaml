@@ -3,19 +3,22 @@ services:
     build: ./client
     environment:
       PORT: "3000"
+      API_URL: "http://api:4000"
     ports:
-      - "127.0.0.1:3500:3000"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:8000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
   api:
     build: ./server
-    ports:
-      - "127.0.0.1:3501:4000"
     environment:
       JwtSecret: ${JWT_SECRET:?Angiv JWT_SECRET i .env}
       BootstrapAdmin__Username: ${ADMIN_USERNAME:-admin}
       BootstrapAdmin__Password: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: "Data Source=/app/data/app.db"
     volumes:
       - api-data:/app/data
+    restart: unless-stopped
 volumes:
   api-data:

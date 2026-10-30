@@ -102,7 +102,7 @@ Kildekode: [GitHub](https://github.com/R0botninj4/Kvist-Bjaelke-Part1).
 
 ## CDS.infrastructure — Part 2
 
-Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kører på serveren, og serverens egen test af `/health` svarer `OK`. En separat Ubuntu Desktop-VM har fået en IP på klientnetværket. Login og CRUD fra klientens browser mangler stadig at blive dokumenteret.
+Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kører på serveren, og serverens egen test af `/health` svarer `OK`. En separat Ubuntu Desktop-VM på klientnetværket har åbnet login-siden på serveren over HTTP. Selve login og CRUD fra klientens browser mangler stadig at blive dokumenteret.
 
 ### IP-plan — 2.1.1
 
@@ -170,7 +170,7 @@ De mindre subnet er sammenligninger, ikke ekstra netværk, der oprettes oven i /
 
 Skolens krav til VM'erne er mindst 4096 MB RAM og to CPU-kerner. VM-ID blev valgt automatisk. Serveren blev installeret fra Ubuntu Server-ISO'en, og ISO'en blev frakoblet efter installationen. Klienten bruger Ubuntu Desktop, så platformen kan testes i Firefox gennem Proxmox-konsollen.
 
-Serveren fik oprindeligt en adresse gennem DHCP. Den aktuelle adresse er `10.5.71.33`. Planen anbefaler statiske serveradresser eller reservationer, men en fast adresse/reservation er endnu ikke dokumenteret i labbet. Hvis serverens adresse ændres, skal `WEB_BIND_ADDRESS` og testadressen også opdateres.
+Serveren fik oprindeligt en adresse gennem DHCP. Den aktuelle adresse er `10.5.71.33`. I labbet beholdes skolens DHCP-konfiguration. `networkctl status ens18` viser adressen `10.5.71.33/24` samt gateway, DNS og DHCP-server `10.5.71.5`. En statisk adresse vælges ikke uden at kende skolens DHCP-pulje eller reservationer. Planens statiske serveradresser er derfor et forslag til virksomheden, ikke den aktuelle labopsætning. Hvis DHCP-adressen ændres, skal `WEB_BIND_ADDRESS` og testadressen opdateres.
 
 ![Server- og klient-VM i Proxmox](docs/screenshots/infrastructure/virtual-machines.png)
 
@@ -179,6 +179,10 @@ Begge VM'er vises som startet i Proxmox.
 ![Serverens hardware og VLAN571-bridge](docs/screenshots/infrastructure/server-hardware.png)
 
 VM 116 har to kerner, 4 GiB RAM, 32 GiB disk og `bridge=VLAN571`. CD/DVD-drevet er tomt efter installationen.
+
+![Serverens faktiske netværkskonfiguration](docs/screenshots/infrastructure/server-network.png)
+
+Netværksoversigten for `ens18` viser DHCP-adresse, gateway og DNS. Skolelabbets gateway `.5` adskiller sig fra den foreslåede `.1` i virksomhedens IP-plan.
 
 ![Klientens hardware og vmbr0-bridge](docs/screenshots/infrastructure/client-hardware.png)
 
@@ -257,17 +261,19 @@ Den fysiske computer var på Wi-Fi med `10.5.3.164` og fik timeout mod platforme
 | `docker compose up -d -build` blev afvist | Rettet til `docker compose up -d --build` | Containerne blev bygget og startet |
 | HTTPS mod serverens HTTP-port gav TLS-fejl | Serverens test blev ændret til `http://` | `/health` svarede `OK`, og forsiden returnerede HTML |
 | Browseren på den fysiske Wi-Fi-computer fik timeout | Oprettet en separat Desktop-klient på `vmbr0` | Klienten fik `10.5.70.169/24` |
-| Firefox i klienten viste `SSL_ERROR_RX_RECORD_TOO_LONG` | Næste test skal bruge hele adressen med `http://` | Succesfuld visning af platformen er endnu ikke dokumenteret |
+| Firefox i klienten viste `SSL_ERROR_RX_RECORD_TOO_LONG` | Adressen blev åbnet med `http://` | Login-siden vises i Firefox på klient-VM 117 |
 
 ![HTTPS-fejl i klientens Firefox](docs/screenshots/infrastructure/client-https-error.png)
 
-Dette er et fejlsøgningsbillede, ikke dokumentation for et vellykket login. Serveren bruger HTTP i labopsætningen, mens browseren forsøgte en TLS-forbindelse.
+Dette er et fejlsøgningsbillede. Serveren bruger HTTP i labopsætningen, mens browseren forsøgte en TLS-forbindelse.
+
+![Login-siden åbnet fra klient-VM 117](docs/screenshots/infrastructure/client-login-page.png)
+
+Klientens Firefox viser nu platformen på `http://10.5.71.33:8000`. Sammen med klientens `10.5.70.169/24`-adresse dokumenterer det HTTP-adgang fra klientnetværket til serveren på VLAN 571. Billedet viser endnu ikke et gennemført login.
 
 Før Part 2 er færdigdokumenteret, mangler:
 
-- Serverens faktiske IP-konfiguration, gateway og DNS samt afklaring af fast adresse/reservation.
 - Klientens gateway og DNS.
-- Screenshot af platformen åbnet med `http://10.5.71.33:8000` i klient-VM'en, med adresselinjen synlig.
 - Login og test af brugerfunktionerne fra klienten, herunder de forskellige rollers rettigheder.
 
 Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også diagrammet under afleveringskravene; den modstrid er ikke afklaret.

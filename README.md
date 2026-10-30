@@ -4,7 +4,7 @@ Login og bruger-CRUD til CDS.security. Projektet tager udgangspunkt i `authoriza
 
 ## CDS.security — Part 1
 
-## Start lokalt
+### Start lokalt
 
 Kræver .NET SDK 10, Bun og PowerShell 7. Kør fra projektets rod i to terminaler.
 
@@ -28,7 +28,7 @@ bun run dev
 
 Frontend og backend kører separat som i authorization-projektet. Der bruges ingen `wwwroot`, CSS, Python eller Razor Pages. Du ændrer frontend i `client/src/App.tsx`.
 
-## Start med Docker
+### Start med Docker
 
 ```powershell
 pwsh -File scripts/setup.ps1
@@ -39,7 +39,7 @@ docker compose up -d --build
 
 Docker er som udgangspunkt bundet til localhost. På Ubuntu sættes `WEB_BIND_ADDRESS` til serverens faktiske IP som beskrevet under Part 2. Lokal udvikling uden Docker bruger stadig port 3500 og 3501.
 
-## Roller
+### Roller
 
 | Rolle | Rettigheder |
 |---|---|
@@ -49,7 +49,7 @@ Docker er som udgangspunkt bundet til localhost. På Ubuntu sættes `WEB_BIND_AD
 
 API'et kontrollerer både den eksisterende og den ønskede rolle, så SuperUser ikke kan ændre en Admin eller oprette en ny Admin. Man kan ikke slette sig selv eller ændre sin egen rolle.
 
-## Hvad er ændret fra authorization-projektet?
+### Hvad er ændret fra authorization-projektet?
 
 - `AuthProvider`, loginmodeller, `frontend.tsx`, password-hasheren og dens interface tager udgangspunkt i originalen. Login bruger nu `/login` på samme adresse som frontend.
 - `UserRepository` og `UserService` er udvidet med hentning af én bruger, opdatering og sletning.
@@ -60,7 +60,7 @@ API'et kontrollerer både den eksisterende og den ønskede rolle, så SuperUser 
 - Første Admin oprettes fra `.env`, når databasen er tom. Ingen credentials er hardcoded eller lagt på GitHub.
 - Logo, CSS og demo-endpoints fra frontend er fjernet.
 
-## Sikkerhedsvalg
+### Sikkerhedsvalg
 
 **Passwords:** Originalens Argon2id anvendes med 64 MiB hukommelse, 3 iterationer, parallelisme 4, et tilfældigt salt på 16 bytes og en hash på 32 bytes. Formatet i databasen er det samme som originalen: `hash.salt`. Sammenligning bruger `FixedTimeEquals`. Ved oprettelse/ændring kræves 12–128 tegn. Et tomt felt ved redigering sendes som `null` og bevarer det gamle password. Argon2id er valgt frem for hurtig SHA-256, fordi password-hashing skal være dyr at brute-force.
 
@@ -68,7 +68,7 @@ API'et kontrollerer både den eksisterende og den ønskede rolle, så SuperUser 
 
 `sessionStorage` er tilgængelig for JavaScript ved XSS; React viser her brugerdata som tekst. HttpOnly-cookies er et muligt alternativ. Til rigtig drift skal HTTP suppleres med HTTPS. Eksemplet har ikke MFA, rate limiting eller password recovery. Browserens API-kald går gennem web-containeren på samme adresse, så serveropsætningen kræver ingen ekstra CORS-adresser.
 
-## Kodestruktur
+### Kodestruktur
 
 ```text
 client/src/auth/AuthProvider.tsx                     Login, token og logout
@@ -82,7 +82,7 @@ server/Security/Startup.cs                           Authentication og services
 server/DataAccess/Startup.cs                         Database og repository
 ```
 
-## Tests
+### Tests
 
 ```powershell
 dotnet test server/KvistBjaelke.sln -c Release
@@ -93,7 +93,7 @@ bun run build
 
 C#-testene bruger en separat, midlertidig database og kontrollerer login, CRUD for alle roller, skjulte password-hashes og afvisning af ulovlige rolleændringer. GitHub Actions kører testene og bygger begge Docker-images.
 
-## Screenshots
+### Screenshots
 
 ![Login](docs/screenshots/login.png)
 ![Brugeradministration](docs/screenshots/admin.png)
@@ -102,79 +102,178 @@ Kildekode: [GitHub](https://github.com/R0botninj4/Kvist-Bjaelke-Part1).
 
 ## CDS.infrastructure — Part 2
 
-Dette er fremgangsmåden til serveropsætningen. VM'en på skolen og forbindelsen fra VLAN 570 er endnu ikke verificeret.
+Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kører på serveren, og serverens egen test af `/health` svarer `OK`. En separat Ubuntu Desktop-VM har fået en IP på klientnetværket. Login og CRUD fra klientens browser mangler stadig at blive dokumenteret.
 
-### Opret Ubuntu Server i Proxmox
+### IP-plan — 2.1.1
 
-1. Vælg den node, det VM-ID og den storage, skolen har tildelt jer.
-2. Opret en VM med skolens Ubuntu Server ISO. Et forslag er 2 CPU-kerner, 4 GB RAM og 25 GB disk; det er vores valg, ikke opgavens minimumskrav.
-3. Brug skolens netværksbridge. Hvis bridgen bruger VLAN-tags, vælges tag **571**. En bridge, der allerede er tilsluttet VLAN 571, skal ikke nødvendigvis tagges igen. Følg skolens anvisning.
-4. Installér Ubuntu Server og opret din egen bruger. OpenSSH kan vælges under installationen, hvis skolen tillader SSH-adgang.
-5. Brug den IP, gateway og DNS, skolen tildeler på `10.5.71.0/24`. Kontrollér med `ip -br address` og `ip route`. Vælg ikke en ledig adresse ved at gætte.
+IP-planen bygger på VLAN3-dokumentet. Dette er forslaget til virksomhedens netværk; alle de foreslåede VLAN er ikke oprettet i skolelabbet.
 
-### Installér Docker på Ubuntu
+Netværkene bruger private adresser fra `10.5.0.0/16`, som ligger i det private område `10.0.0.0/8`. VLAN 570 og 571 samt deres /24-netværk er givet i opgaven. De øvrige netværk fortsætter samme nummerering. Eksempelvis bruger VLAN **572** adresser fra `10.5.72.0/24`; tredje oktet følger her VLAN-nummerets sidste to cifre.
 
-Kør i VM'ens konsol eller gennem SSH. Kommandoerne forudsætter en ny Ubuntu Server uden en anden Docker-installation.
+| VLAN | Navn | Enheder | Nu | Ved fordobling | Mindste subnet inkl. gateway | Valgt netværk | Foreslået gateway | Adressering |
+|---|---|---|---:|---:|---|---|---|---|
+| 570 | Clients | 15 stationære og 10 bærbare | 25 | 50 | /26, 62 værter | 10.5.70.0/24 | 10.5.70.1 | DHCP |
+| 571 | Servers | Servere og login-VM | 4 | 8 | /28, 14 værter | 10.5.71.0/24 | 10.5.71.1 | Statisk |
+| 572 | Voice | IP-telefoner | 12 | 24 | /27, 30 værter | 10.5.72.0/24 | 10.5.72.1 | DHCP |
+| 573 | Printers | Netværksprintere | 3 | 6 | /28, 14 værter | 10.5.73.0/24 | 10.5.73.1 | Statisk/reservation |
+| 574 | Cameras | Overvågningskameraer | 6 | 12 | /28, 14 værter | 10.5.74.0/24 | 10.5.74.1 | Statisk |
+| 575 | Guest | Gæsters enheder | ca. 50 | 100 | /25, 126 værter | 10.5.75.0/24 | 10.5.75.1 | DHCP, kort lejetid |
+| 579 | MGMT | Switches, firewall og access points | ca. 10 | 20 | /27, 30 værter | 10.5.79.0/24 | 10.5.79.1 | Statisk |
+
+Antallet af enheder fordobles i beregningen for at give plads til vækst. Planens fire servere fortolkes som opgavens tre servere plus en separat login-VM. Gæsteantallet er et skøn, da opgaven angiver et variabelt antal. Management skønnes til ca. ti enheder: en firewall, fire–fem switches og fire access points.
+
+I forslaget er firewallen gateway på `.1` og leverer DHCP til de relevante VLAN. Statiske adresser placeres i `.2–.49`, og DHCP bruger `.50–.250`. Printere kan bruge DHCP-reservationer, så deres adresse bliver den samme. De faktiske gateways og DHCP-puljer i skolelabbet er ikke verificeret med denne plan.
+
+Forslaget er to trådløse netværk på de fire access points: medarbejdere tilknyttes VLAN 570, og gæster VLAN 575. Access points administreres gennem VLAN 579. Fjernadgang for medarbejdere kan ske gennem VPN på firewallen. Dette beskriver virksomhedens foreslåede løsning, ikke skolens nuværende Wi-Fi.
+
+| Netværk | Begrundelse for opdelingen |
+|---|---|
+| Clients | Medarbejdernes computere adskilles fra serverne, så adgangen kan begrænses. |
+| Servers | Servere indeholder data og loginplatformen. Kun nødvendige forbindelser skal tillades. |
+| Voice | Telefontrafik adskilles og kan prioriteres med QoS. |
+| Printers | Printere har ofte lang levetid og skal ikke kunne tilgå alle interne systemer. |
+| Cameras | Kameraer håndterer følsomme optagelser og bør kun nå fx optageserveren. |
+| Guest | Ukendte enheder skal have internetadgang, men ikke adgang til interne systemer. |
+| MGMT | Administrationssider skal kun være tilgængelige for IT. |
+
+VLAN begrænser broadcasttrafik og gør det muligt at styre forbindelser mellem enhedsgrupperne. Det kræver også firewallregler; opdeling i VLAN alene bestemmer ikke, hvilken routet trafik der tillades.
+
+### Subnetting — 2.1.2
+
+| Netværk | Netværksadresse | Maske | Brugbare værter | Værtsinterval | Broadcast | Behov inkl. vækst og gateway | Ledige efter behov |
+|---|---|---|---:|---|---|---:|---:|
+| Clients, valgt | 10.5.70.0/24 | 255.255.255.0 | 254 | 10.5.70.1–10.5.70.254 | 10.5.70.255 | 51 | 203 |
+| Clients, mindste passende | 10.5.70.0/26 | 255.255.255.192 | 62 | 10.5.70.1–10.5.70.62 | 10.5.70.63 | 51 | 11 |
+| Servers, valgt | 10.5.71.0/24 | 255.255.255.0 | 254 | 10.5.71.1–10.5.71.254 | 10.5.71.255 | 9 | 245 |
+| Servers, mindste passende | 10.5.71.0/28 | 255.255.255.240 | 14 | 10.5.71.1–10.5.71.14 | 10.5.71.15 | 9 | 5 |
+| Voice, valgt | 10.5.72.0/24 | 255.255.255.0 | 254 | 10.5.72.1–10.5.72.254 | 10.5.72.255 | 25 | 229 |
+| Voice, mindste passende | 10.5.72.0/27 | 255.255.255.224 | 30 | 10.5.72.1–10.5.72.30 | 10.5.72.31 | 25 | 5 |
+
+Antallet af brugbare adresser beregnes som `2^(32 − præfiks) − 2`. To adresser går til netværksadresse og broadcast. Gatewayen bruger også en af værtsadresserne. Eksempelvis kræver 50 klienter og en gateway 51 adresser, så /26 med 62 brugbare adresser er det mindste passende subnet.
+
+De mindre subnet er sammenligninger, ikke ekstra netværk, der oprettes oven i /24-netværkene. Planen vælger /24 til alle grupper for ensartet administration og plads til yderligere vækst. Det giver 254 brugbare adresser per netværk og opfylder de givne /24-netværk for VLAN 570 og 571.
+
+### Server og klient i Proxmox — 2.2 og 2.3
+
+| | Server | Klient |
+|---|---|---|
+| Node | pve01 | pve01 |
+| VM-ID | 116 | 117 |
+| Navn i Proxmox | JPM-server | JPM-Desktop |
+| Operativsystem | Ubuntu Server 26.04.1 LTS | Ubuntu Desktop 26.04.1 |
+| CPU | 2 kerner | 2 kerner |
+| RAM | 4096 MiB | 4096 MiB |
+| Disk | 32 GiB, local-lvm | 32 GiB, local-lvm |
+| Bridge | VLAN571 | vmbr0 |
+| Netværk | VLAN 571, 10.5.71.0/24 | Klientnetværket, 10.5.70.0/24 |
+| Observeret IPv4 | 10.5.71.33 | 10.5.70.169/24 |
+
+Skolens krav til VM'erne er mindst 4096 MB RAM og to CPU-kerner. VM-ID blev valgt automatisk. Serveren blev installeret fra Ubuntu Server-ISO'en, og ISO'en blev frakoblet efter installationen. Klienten bruger Ubuntu Desktop, så platformen kan testes i Firefox gennem Proxmox-konsollen.
+
+Serveren fik oprindeligt en adresse gennem DHCP. Den aktuelle adresse er `10.5.71.33`. Planen anbefaler statiske serveradresser eller reservationer, men en fast adresse/reservation er endnu ikke dokumenteret i labbet. Hvis serverens adresse ændres, skal `WEB_BIND_ADDRESS` og testadressen også opdateres.
+
+![Server- og klient-VM i Proxmox](docs/screenshots/infrastructure/virtual-machines.png)
+
+Begge VM'er vises som startet i Proxmox.
+
+![Serverens hardware og VLAN571-bridge](docs/screenshots/infrastructure/server-hardware.png)
+
+VM 116 har to kerner, 4 GiB RAM, 32 GiB disk og `bridge=VLAN571`. CD/DVD-drevet er tomt efter installationen.
+
+![Klientens hardware og vmbr0-bridge](docs/screenshots/infrastructure/client-hardware.png)
+
+VM 117 bruger `vmbr0` uden ekstra VLAN-tag. Billedet er fra opsætningen, hvor Desktop-ISO'en stadig var tilsluttet.
+
+![Klientens IPv4-konfiguration](docs/screenshots/infrastructure/client-ip.png)
+
+Kommandoen `ip -4 -br address` viser `ens18` med `10.5.70.169/24`. Det bekræfter, at klienten har fået en adresse i opgavens klientnetværk. Gateway og DNS skal også dokumenteres med den faktiske konfiguration.
+
+### Docker på Ubuntu Server
+
+Docker blev installeret fra Ubuntus pakkearkiv. Følgende kommandoer blev brugt fra administratorprompten:
 
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git openssl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable --now docker
-sudo docker run --rm hello-world
-sudo docker compose version
+apt update
+apt install -y docker.io docker-compose-v2 docker-buildx git curl openssl
+systemctl enable --now docker
+docker run --rm hello-world
+docker compose version
 ```
 
-Kilde: [Dockers installationsvejledning til Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
+Ved kørsel fra en almindelig bruger sættes `sudo` foran kommandoer, der kræver administratoradgang.
+
+![Docker hello-world og Compose-version](docs/screenshots/infrastructure/docker-test.png)
+
+`Hello from Docker!` viser, at Docker kunne hente og køre en container. Billedet viser også Compose-version `2.40.3+ds1-0ubuntu1`.
 
 ### Hent og start platformen
 
+Kilden blev hentet fra det private GitHub-repo. GitHub CLI's browserlogin blev brugt, så et langt token ikke skulle indtastes i Proxmox-konsollen.
+
 ```bash
+apt install -y gh
+gh auth login
 git clone https://github.com/R0botninj4/Kvist-Bjaelke-Part1.git
 cd Kvist-Bjaelke-Part1
 sh scripts/setup.sh
 nano .env
 ```
 
-Repoet er privat, så GitHub kræver adgang ved kloning. Brug din egen godkendte GitHub-adgang. Gem aldrig et token i kloningsadressen eller README.
+I `.env` blev denne linje sat:
 
-I `.env` sættes `WEB_BIND_ADDRESS` til Ubuntu-serverens faktiske IPv4-adresse på VLAN 571. Behold de genererede værdier for `JWT_SECRET` og `ADMIN_PASSWORD`. Brugernavnet er `admin`; password står i `.env`. Filen skal ikke med på GitHub eller screenshots.
-
-```bash
-sudo docker compose up -d --build
-sudo docker compose ps
-sudo docker compose logs --tail=50
+```text
+WEB_BIND_ADDRESS=10.5.71.33
 ```
 
-Åbn `http://SERVER-IP:8000`, hvor `SERVER-IP` erstattes af den faktiske adresse. TCP **8000** er valgt, fordi porten er inden for opgavens interval 8000–8100. Browseren bruger denne ene port til både frontend og API. Containerne starter igen efter genstart af Docker/serveren.
-
-Hvis forbindelsen fejler, kontrollér først IP-adresse, containerlogs og VLAN. Hvis Ubuntu har en aktiv lokal firewall, skal den også tillade den krævede trafik på TCP 8000 fra VLAN 570. Skolens netværksfirewall er ifølge opgaven allerede konfigureret; den skal ikke ændres.
-
-### Kontrollér og dokumentér serveren
+De genererede værdier for JWT-nøgle og admin-password blev bevaret. Admin-login findes kun i serverens lokale `.env`. Passwords, tokens og indholdet af `.env` skal ikke med i dokumentationen.
 
 ```bash
-cat /etc/os-release
-ip -br address
-ip route
-sudo systemctl is-active docker
-sudo docker compose ps
-curl -f http://SERVER-IP:8000/health
+docker compose up -d --build
+docker compose ps
+curl http://10.5.71.33:8000/health
 ```
 
-`/health` skal svare `OK`. Tag screenshots af Ubuntu-version, IP-konfiguration, Docker og kørende containere. Fra klient-VM'en på VLAN 570 åbnes derefter `http://SERVER-IP:8000`. Test login og brugerfunktioner og gem screenshots med adresselinjen synlig.
+Der kører en web-container og en API-container. Web-containeren lytter på serverens TCP-port **8000**, som er inden for opgavens interval 8000–8100. Den sender API-kald videre internt til C#-containeren på port 4000. API'et har ingen separat port ud på skolens netværk. SQLite-databasen gemmes i Docker-volumen `api-data`.
 
-De faktiske IP-adresser, screenshots og testresultater tilføjes efter opsætningen på skolen. En vellykket lokal test eller et Docker-build dokumenterer ikke i sig selv forbindelsen mellem skolens VLAN.
+Adressen til platformen er **http://10.5.71.33:8000**. `/health` er kun en kontrol af, om API'et svarer; den tester ikke login eller CRUD.
 
-Ved opdatering køres `git pull` og `sudo docker compose up -d --build`. `sudo docker compose down` stopper platformen og bevarer databasen. Brug ikke `down -v`, hvis kontiene skal bevares. En ny server/et nyt Docker-volumen får en ny database; den lokale `app.db` kopieres ikke automatisk.
+![Kørende containere og HTTP-test på serveren](docs/screenshots/infrastructure/server-health.png)
+
+`docker compose ps` viser begge containere som `Up`. HTTP-kaldet til `/health` svarer `OK`, og kaldet til forsiden returnerer HTML. Testene er udført på serveren selv.
+
+Ved opdatering køres `git pull` og `docker compose up -d --build`. `docker compose down` stopper platformen og bevarer databasen. `down -v` sletter volumen og må ikke bruges, hvis kontiene skal bevares.
+
+### Routing og firewall
+
+VLAN 570 og VLAN 571 er forskellige netværk. En klient på `10.5.70.0/24` skal derfor sende trafik til servernetværket gennem en router/default gateway. Firewallen bestemmer, hvilke forbindelser der får lov at passere. Ifølge opgaven er TCP 8000–8100 allerede tilladt fra VLAN 570 til VLAN 571. Vi bruger TCP 8000 og har ikke ændret skolens firewallregler.
+
+Den fysiske computer var på Wi-Fi med `10.5.3.164` og fik timeout mod platformen. Det viser ikke i sig selv, hvilken firewallregel der blokerede forbindelsen. Testen blev derfor flyttet til klient-VM'en på det krævede klientnetværk. Proxmox kan bruges fra den fysiske computer, selv om computeren ikke selv har adgang til alle VM-netværk.
+
+### Problemer og teststatus — 2.6
+
+| Problem | Hvad blev gjort? | Resultat |
+|---|---|---|
+| Specialtegn blev ikke overført korrekt gennem automatiseret konsolinput | Kommandoerne blev indtastet manuelt | Docker og Compose blev installeret |
+| `docker compose up -d -build` blev afvist | Rettet til `docker compose up -d --build` | Containerne blev bygget og startet |
+| HTTPS mod serverens HTTP-port gav TLS-fejl | Serverens test blev ændret til `http://` | `/health` svarede `OK`, og forsiden returnerede HTML |
+| Browseren på den fysiske Wi-Fi-computer fik timeout | Oprettet en separat Desktop-klient på `vmbr0` | Klienten fik `10.5.70.169/24` |
+| Firefox i klienten viste `SSL_ERROR_RX_RECORD_TOO_LONG` | Næste test skal bruge hele adressen med `http://` | Succesfuld visning af platformen er endnu ikke dokumenteret |
+
+![HTTPS-fejl i klientens Firefox](docs/screenshots/infrastructure/client-https-error.png)
+
+Dette er et fejlsøgningsbillede, ikke dokumentation for et vellykket login. Serveren bruger HTTP i labopsætningen, mens browseren forsøgte en TLS-forbindelse.
+
+Før Part 2 er færdigdokumenteret, mangler:
+
+- Serverens faktiske IP-konfiguration, gateway og DNS samt afklaring af fast adresse/reservation.
+- Klientens gateway og DNS.
+- Screenshot af platformen åbnet med `http://10.5.71.33:8000` i klient-VM'en, med adresselinjen synlig.
+- Login og test af brugerfunktionerne fra klienten, herunder de forskellige rollers rettigheder.
+
+Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også diagrammet under afleveringskravene; den modstrid er ikke afklaret.
+
+## Afsluttende refleksion — Part 3
+
+Forløbet viser, at en fungerende applikation i Docker ikke er nok til at sikre adgang fra en anden computer. Containerne og serverens egne HTTP-tests virkede, mens klientens netværk og brugen af HTTP/HTTPS stadig gav problemer. Derfor skal både applikation, adressering, routing og den konkrete klientforbindelse testes.
+
+Til drift i en virksomhed ville vi bruge HTTPS, en fast serveradresse eller DHCP-reservation og en plan for backup af databasen. Klientens afsluttende login- og CRUD-test mangler stadig, så den samlede test kan ikke betragtes som afsluttet.

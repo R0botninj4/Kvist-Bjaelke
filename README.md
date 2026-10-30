@@ -102,7 +102,7 @@ Kildekode: [GitHub](https://github.com/R0botninj4/Kvist-Bjaelke-Part1).
 
 ## CDS.infrastructure — Part 2
 
-Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kører på serveren, og serverens egen test af `/health` svarer `OK`. En separat Ubuntu Desktop-VM på klientnetværket har åbnet login-siden på serveren over HTTP. Selve login og CRUD fra klientens browser mangler stadig at blive dokumenteret.
+Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kører på serveren, og serverens egen test af `/health` svarer `OK`. En separat Ubuntu Desktop-VM på klientnetværket har åbnet login-siden på serveren over HTTP. Login, CRUD og rollernes rettigheder er kontrolleret i applikationens automatiserede tests. Billedet fra klienten dokumenterer adgang til login-siden over netværket.
 
 ### IP-plan — 2.1.1
 
@@ -275,9 +275,7 @@ Klientens Firefox viser nu platformen på `http://10.5.71.33:8000`. Sammen med k
 
 Klientens netværksoversigt viser IP-adressen `10.5.70.169/24`, gateway `10.5.70.5` og DNS `10.5.70.5` på `ens18`.
 
-Før Part 2 er færdigdokumenteret, mangler:
-
-- Login og test af brugerfunktionerne fra klienten, herunder de forskellige rollers rettigheder.
+Login, CRUD og rollebegrænsninger er testet automatisk som beskrevet under Part 1. I skolelabbet er Docker-driften, serverens HTTP-svar og adgang til login-siden fra klient-VM dokumenteret. En fuld manuel gennemgang af CRUD for hver rolle fra klient-VM er ikke udført.
 
 Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også diagrammet under afleveringskravene; den modstrid er ikke afklaret.
 
@@ -285,4 +283,4 @@ Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også
 
 Forløbet viser, at en fungerende applikation i Docker ikke er nok til at sikre adgang fra en anden computer. Containerne og serverens egne HTTP-tests virkede, mens klientens netværk og brugen af HTTP/HTTPS stadig gav problemer. Derfor skal både applikation, adressering, routing og den konkrete klientforbindelse testes.
 
-Til drift i en virksomhed ville vi bruge HTTPS, en fast serveradresse eller DHCP-reservation og en plan for backup af databasen. Klientens afsluttende login- og CRUD-test mangler stadig, så den samlede test kan ikke betragtes som afsluttet.
+Til drift i en virksomhed ville vi bruge HTTPS, en fast serveradresse eller DHCP-reservation og en plan for backup af databasen. De automatiserede tests kontrollerer applikationens login, CRUD og roller, mens labbillederne viser Docker-drift og netværksadgang fra klienten.

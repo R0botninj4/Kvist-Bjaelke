@@ -271,9 +271,12 @@ Dette er et fejlsøgningsbillede. Serveren bruger HTTP i labopsætningen, mens b
 
 Klientens Firefox viser nu platformen på `http://10.5.71.33:8000`. Sammen med klientens `10.5.70.169/24`-adresse dokumenterer det HTTP-adgang fra klientnetværket til serveren på VLAN 571. Billedet viser endnu ikke et gennemført login.
 
+![Klientens IP, gateway og DNS](docs/screenshots/infrastructure/client-network.png)
+
+Klientens netværksoversigt viser IP-adressen `10.5.70.169/24`, gateway `10.5.70.5` og DNS `10.5.70.5` på `ens18`.
+
 Før Part 2 er færdigdokumenteret, mangler:
 
-- Klientens gateway og DNS.
 - Login og test af brugerfunktionerne fra klienten, herunder de forskellige rollers rettigheder.
 
 Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også diagrammet under afleveringskravene; den modstrid er ikke afklaret.

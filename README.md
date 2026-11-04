@@ -108,7 +108,7 @@ Platformen er sat op på Ubuntu Server i skolens Proxmox. Docker-containerne kø
 
 IP-planen bygger på VLAN3-dokumentet. Dette er forslaget til virksomhedens netværk; alle de foreslåede VLAN er ikke oprettet i skolelabbet.
 
-Netværkene bruger private adresser fra `10.5.0.0/16`, som ligger i det private område `10.0.0.0/8`. VLAN 570 og 571 samt deres /24-netværk er givet i opgaven. De øvrige netværk fortsætter samme nummerering. Eksempelvis bruger VLAN **572** adresser fra `10.5.72.0/24`; tredje oktet følger her VLAN-nummerets sidste to cifre.
+Vi bruger private adresser i 10.5.0.0/16. VLAN 570 og 571 er givet i opgaven. De øvrige følger samme nummerering, fx VLAN 572 med 10.5.72.0/24.
 
 | VLAN | Navn | Enheder | Nu | Ved fordobling | Mindste subnet inkl. gateway | Valgt netværk | Foreslået gateway | Adressering |
 |---|---|---|---:|---:|---|---|---|---|
@@ -120,11 +120,11 @@ Netværkene bruger private adresser fra `10.5.0.0/16`, som ligger i det private 
 | 575 | Guest | Gæsters enheder | ca. 50 | 100 | /25, 126 værter | 10.5.75.0/24 | 10.5.75.1 | DHCP, kort lejetid |
 | 579 | MGMT | Switches, firewall og access points | ca. 10 | 20 | /27, 30 værter | 10.5.79.0/24 | 10.5.79.1 | Statisk |
 
-Antallet af enheder fordobles i beregningen for at give plads til vækst. Planens fire servere fortolkes som opgavens tre servere plus en separat login-VM. Gæsteantallet er et skøn, da opgaven angiver et variabelt antal. Management skønnes til ca. ti enheder: en firewall, fire–fem switches og fire access points.
+Vi regner med dobbelt så mange enheder for at give plads til vækst. De fire servere er de tre fra opgaven plus login-VM. Gæster og management er skønnet til ca. 50 og 10 enheder.
 
-I forslaget er firewallen gateway på `.1` og leverer DHCP til de relevante VLAN. Statiske adresser placeres i `.2–.49`, og DHCP bruger `.50–.250`. Printere kan bruge DHCP-reservationer, så deres adresse bliver den samme. De faktiske gateways og DHCP-puljer i skolelabbet er ikke verificeret med denne plan.
+I virksomhedens plan er gatewayen .1. Statiske adresser bruger .2–.49 og DHCP .50–.250. Printere kan bruge DHCP-reservationer. Skolelabbet har sin egen adressering.
 
-Forslaget er to trådløse netværk på de fire access points: medarbejdere tilknyttes VLAN 570, og gæster VLAN 575. Access points administreres gennem VLAN 579. Fjernadgang for medarbejdere kan ske gennem VPN på firewallen. Dette beskriver virksomhedens foreslåede løsning, ikke skolens nuværende Wi-Fi.
+De fire access points giver medarbejdere adgang til VLAN 570 og gæster til VLAN 575. Administration ligger på VLAN 579. Medarbejdere kan få fjernadgang gennem VPN på firewallen.
 
 | Netværk | Begrundelse for opdelingen |
 |---|---|
@@ -136,7 +136,7 @@ Forslaget er to trådløse netværk på de fire access points: medarbejdere tilk
 | Guest | Ukendte enheder skal have internetadgang, men ikke adgang til interne systemer. |
 | MGMT | Administrationssider skal kun være tilgængelige for IT. |
 
-VLAN begrænser broadcasttrafik og gør det muligt at styre forbindelser mellem enhedsgrupperne. Det kræver også firewallregler; opdeling i VLAN alene bestemmer ikke, hvilken routet trafik der tillades.
+VLAN adskiller enhedsgrupperne. Firewallregler styrer trafikken mellem dem.
 
 ### Subnetting — 2.1.2
 
@@ -149,9 +149,9 @@ VLAN begrænser broadcasttrafik og gør det muligt at styre forbindelser mellem 
 | Voice, valgt | 10.5.72.0/24 | 255.255.255.0 | 254 | 10.5.72.1–10.5.72.254 | 10.5.72.255 | 25 | 229 |
 | Voice, mindste passende | 10.5.72.0/27 | 255.255.255.224 | 30 | 10.5.72.1–10.5.72.30 | 10.5.72.31 | 25 | 5 |
 
-Antallet af brugbare adresser beregnes som `2^(32 − præfiks) − 2`. To adresser går til netværksadresse og broadcast. Gatewayen bruger også en af værtsadresserne. Eksempelvis kræver 50 klienter og en gateway 51 adresser, så /26 med 62 brugbare adresser er det mindste passende subnet.
+Brugbare adresser beregnes med `2^(32 − præfiks) − 2`. Netværksadresse og broadcast kan ikke bruges til enheder. 50 klienter og en gateway kræver 51 adresser, så /26 er nok.
 
-De mindre subnet er sammenligninger, ikke ekstra netværk, der oprettes oven i /24-netværkene. Planen vælger /24 til alle grupper for ensartet administration og plads til yderligere vækst. Det giver 254 brugbare adresser per netværk og opfylder de givne /24-netværk for VLAN 570 og 571.
+Vi vælger /24 med 254 brugbare adresser i hvert VLAN. Det er nemt at administrere og giver plads til vækst. De mindre subnet i tabellen viser minimumsbehovet.
 
 ### Server og klient i Proxmox — 2.2 og 2.3
 
@@ -170,7 +170,7 @@ De mindre subnet er sammenligninger, ikke ekstra netværk, der oprettes oven i /
 
 Skolens krav til VM'erne er mindst 4096 MB RAM og to CPU-kerner. VM-ID blev valgt automatisk. Serveren blev installeret fra Ubuntu Server-ISO'en, og ISO'en blev frakoblet efter installationen. Klienten bruger Ubuntu Desktop, så platformen kan testes i Firefox gennem Proxmox-konsollen.
 
-Serveren fik oprindeligt en adresse gennem DHCP. Den aktuelle adresse er `10.5.71.33`. I labbet beholdes skolens DHCP-konfiguration. `networkctl status ens18` viser adressen `10.5.71.33/24` samt gateway, DNS og DHCP-server `10.5.71.5`. En statisk adresse vælges ikke uden at kende skolens DHCP-pulje eller reservationer. Planens statiske serveradresser er derfor et forslag til virksomheden, ikke den aktuelle labopsætning. Hvis DHCP-adressen ændres, skal `WEB_BIND_ADDRESS` og testadressen opdateres.
+Serveren bruger skolens DHCP og har IP `10.5.71.33/24`. Gateway, DNS og DHCP-server er `10.5.71.5`. Vi beholdt skolens opsætning, da vi ikke kender DHCP-puljen. Hvis IP-adressen ændres, skal `WEB_BIND_ADDRESS` og adressen i browseren opdateres.
 
 ![Server- og klient-VM i Proxmox](docs/screenshots/infrastructure/virtual-machines.png)
 
@@ -190,7 +190,7 @@ VM 117 bruger `vmbr0` uden ekstra VLAN-tag. Billedet er fra opsætningen, hvor D
 
 ![Klientens IPv4-konfiguration](docs/screenshots/infrastructure/client-ip.png)
 
-Kommandoen `ip -4 -br address` viser `ens18` med `10.5.70.169/24`. Det bekræfter, at klienten har fået en adresse i opgavens klientnetværk. Gateway og DNS skal også dokumenteres med den faktiske konfiguration.
+`ip -4 -br address` viser klientens adresse: `10.5.70.169/24` på `ens18`.
 
 ### Docker på Ubuntu Server
 
@@ -249,9 +249,9 @@ Ved opdatering køres `git pull` og `docker compose up -d --build`. `docker comp
 
 ### Routing og firewall
 
-VLAN 570 og VLAN 571 er forskellige netværk. En klient på `10.5.70.0/24` skal derfor sende trafik til servernetværket gennem en router/default gateway. Firewallen bestemmer, hvilke forbindelser der får lov at passere. Ifølge opgaven er TCP 8000–8100 allerede tilladt fra VLAN 570 til VLAN 571. Vi bruger TCP 8000 og har ikke ændret skolens firewallregler.
+Klienten på VLAN 570 når serveren på VLAN 571 gennem gatewayen. Ifølge opgaven er TCP 8000–8100 allerede tilladt mellem netværkene. Platformen bruger port 8000. Vi har ikke ændret skolens firewall.
 
-Den fysiske computer var på Wi-Fi med `10.5.3.164` og fik timeout mod platformen. Det viser ikke i sig selv, hvilken firewallregel der blokerede forbindelsen. Testen blev derfor flyttet til klient-VM'en på det krævede klientnetværk. Proxmox kan bruges fra den fysiske computer, selv om computeren ikke selv har adgang til alle VM-netværk.
+Den fysiske computer fik timeout fra skolens Wi-Fi. Derfor brugte vi klient-VM på 10.5.70.0/24 til at åbne platformen.
 
 ### Problemer og teststatus — 2.6
 
@@ -269,7 +269,7 @@ Dette er et fejlsøgningsbillede. Serveren bruger HTTP i labopsætningen, mens b
 
 ![Login-siden åbnet fra klient-VM 117](docs/screenshots/infrastructure/client-login-page.png)
 
-Klientens Firefox viser nu platformen på `http://10.5.71.33:8000`. Sammen med klientens `10.5.70.169/24`-adresse dokumenterer det HTTP-adgang fra klientnetværket til serveren på VLAN 571. Billedet viser endnu ikke et gennemført login.
+Firefox på klienten åbner `http://10.5.71.33:8000`. Billedet viser adgang til login-siden fra VLAN 570 til VLAN 571, men ikke et gennemført login.
 
 ![Klientens IP, gateway og DNS](docs/screenshots/infrastructure/client-network.png)
 
@@ -281,6 +281,6 @@ Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også
 
 ## Afsluttende refleksion — Part 3
 
-Forløbet viser, at en fungerende applikation i Docker ikke er nok til at sikre adgang fra en anden computer. Containerne og serverens egne HTTP-tests virkede, mens klientens netværk og brugen af HTTP/HTTPS stadig gav problemer. Derfor skal både applikation, adressering, routing og den konkrete klientforbindelse testes.
+Docker virkede på serveren, mens browseren stadig gav fejl. Vi fik adgang fra klient-VM ved at bruge det rigtige netværk og HTTP i stedet for HTTPS.
 
-Til drift i en virksomhed ville vi bruge HTTPS, en fast serveradresse eller DHCP-reservation og en plan for backup af databasen. De automatiserede tests kontrollerer applikationens login, CRUD og roller, mens labbillederne viser Docker-drift og netværksadgang fra klienten.
+Til rigtig drift ville vi tilføje HTTPS, en fast IP eller DHCP-reservation og backup af databasen. Login, CRUD og roller er testet automatisk. Billederne fra labbet viser Docker og adgang fra klienten.

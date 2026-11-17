@@ -284,3 +284,11 @@ Det valgfrie netværksdiagram i afsnit 2.5 er udeladt. Opgaven nævner dog også
 Docker virkede på serveren, mens browseren stadig gav fejl. Vi fik adgang fra klient-VM ved at bruge det rigtige netværk og HTTP i stedet for HTTPS.
 
 Til rigtig drift ville vi tilføje HTTPS, en fast IP eller DHCP-reservation og backup af databasen. Login, CRUD og roller er testet automatisk. Billederne fra labbet viser Docker og adgang fra klienten.
+
+### Brug af AI
+
+Vi brugte AI som vejledning, når vi stødte på problemer eller havde brug for at få noget forklaret. AI hjalp os med at forstå fejl og viste trin for trin, hvordan vi kunne gå videre.
+
+Vi fik også vejledning af AI til at sætte serveren op i en virtuel maskine (VM), fordi vi ikke havde prøvet den type serveropsætning før. Vi fulgte vejledningen og satte selv serveren op.
+
+Et konkret eksempel var, da Firefox viste fejlen `SSL_ERROR_RX_RECORD_TOO_LONG`. Vi bad AI om at forklare fejlen og hjælpe os med at finde årsagen. Vi prøvede derefter selv at åbne adressen med `http://`, og så kunne vi se login-siden fra klient-VM’en.
